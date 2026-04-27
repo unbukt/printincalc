@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Print In calculator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body { font-family: 'Roboto', sans-serif; background-color: #0f172a; color: #e2e8f0; overflow: hidden; }
+.value-display { font-family: 'Courier New', monospace; color: #38bdf8; font-weight: bold; }
+.glass-panel {
+background: rgba(30, 41, 59, 0.65); backdrop-filter: blur(12px);
+border: 1px solid rgba(148, 163, 184, 0.15); box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;
+}
+.col-header {
+background: rgba(15, 23, 42, 0.4); border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+padding: 0.75rem 1rem; font-weight: 600; font-size: 0.9rem;
+letter-spacing: 0.02em; color: #f8fafc; flex-shrink: 0;
+}
+.col-content {
+padding: 0.75rem; display: flex; flex-direction: column; flex: 1; min-height: 0;
+}
+.calc-input-sm {
+width: 100%; padding: 0.45rem 0.6rem; background: rgba(15, 23, 42, 0.6);
+border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 6px; color: #e2e8f0; font-size: 0.85rem;
+transition: all 0.2s;
+}
+.calc-input-sm:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.15); }
+.calc-label-sm { font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.15rem; display: block; font-weight: 500; }
+.btn-calc { border: none; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.2s; width: 100%; font-size: 0.9rem; }
+.btn-add { background: #0284c7; color: white; } .btn-add:hover { background: #0369a1; }
+.btn-clear { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); } .btn-clear:hover { background: rgba(239, 68, 68, 0.3); }
+.btn-pdf { background: #0ea5e9; color: white; } .btn-pdf:hover { background: #0284c7; }
+.quote-item { background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(148, 163, 184, 0.15); border-radius: 10px; padding: 0.8rem; margin-bottom: 0.6rem; position: relative; }
+.breakdown-line { display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0; font-size: 0.75rem; border-bottom: 1px dashed rgba(148, 163, 184, 0.1); flex-wrap: wrap; }
+.breakdown-line span:nth-child(2) { white-space: nowrap; color: #94a3b8; font-size: 0.7rem; }
+.breakdown-line span:last-child { white-space: nowrap; font-weight: 500; color: #7dd3fc; flex-shrink: 0; }
+.breakdown-total { margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid rgba(148, 163, 184, 0.2); font-weight: 600; text-align: right; color: #38bdf8; font-size: 0.9rem; }
+.quote-total { background: linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(14, 165, 233, 0.15)); border: 1px solid rgba(56, 189, 248, 0.3); color: white; padding: 0.8rem; border-radius: 10px; text-align: center; flex-shrink: 0; }
+.quote-total-amount { font-size: 1.5rem; font-weight: 700; color: #7dd3fc; font-family: 'Courier New', monospace; }
+.vat-line { margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.3); font-size: 0.8rem; opacity: 0.9; display: flex; justify-content: center; gap: 4px; }
+.vat-line span:last-child { color: #bae6fd; font-weight: 600; font-family: 'Courier New', monospace; }
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); display: flex; justify-content: center; align-items: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.modal.active { opacity: 1; pointer-events: auto; }
+.modal-content { background: #1e293b; padding: 1.5rem; border-radius: 12px; max-width: 700px; width: 90%; max-height: 85vh; overflow-y: auto; position: relative; border: 1px solid rgba(148, 163, 184, 0.2); }
+.close-modal { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #94a3b8; }
+.ref-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.85rem; }
+.ref-table th, .ref-table td { padding: 0.4rem 0.6rem; border-bottom: 1px solid rgba(148, 163, 184, 0.1); text-align: left; }
+.ref-table th { background: rgba(30, 41, 59, 0.5); font-weight: 600; color: #94a3b8; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
+@media print {
+@page { margin: 12mm; }
+body * { visibility: hidden !important; }
+#print-area, #print-area * { visibility: visible !important; }
+#print-area {
+position: absolute; left: 0; top: 0; width: 100%; height: auto;
+background: white !important; color: #111 !important;
+padding: 15px !important; margin: 0 !important;
+box-shadow: none !important; border: none !important;
+}
+}
+/* 🔐 AUTH MODAL */
+.auth-overlay {
+position: fixed; inset: 0; background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(10px);
+display: flex; justify-content: center; align-items: center; z-index: 9999;
+transition: opacity 0.35s, visibility 0.35s;
+}
+.auth-overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.auth-box {
+width: 340px; padding: 2rem; text-align: center;
+background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(148, 163, 184, 0.2);
+border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+transform: translateY(10px); transition: transform 0.3s;
+}
+.auth-overlay:not(.hidden) .auth-box { transform: translateY(0); }
+.auth-title { margin: 0 0 0.4rem; font-size: 1.25rem; color: #f8fafc; font-weight: 700; }
+.auth-sub { margin: 0 0 1.5rem; font-size: 0.8rem; color: #94a3b8; }
+.auth-field { margin-bottom: 1rem; text-align: left; }
+.auth-field label { display: block; font-size: 0.7rem; color: #94a3b8; margin-bottom: 0.3rem; font-weight: 500; }
+.auth-field input {
+width: 100%; padding: 0.65rem; background: rgba(15, 23, 42, 0.6);
+border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px;
+color: #e2e8f0; font-size: 0.9rem; outline: none; transition: 0.2s;
+}
+.auth-field input:focus { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.15); }
+.auth-error { color: #f87171; font-size: 0.75rem; min-height: 1.1em; margin-bottom: 0.8rem; opacity: 0; transition: opacity 0.2s; }
+.auth-error.show { opacity: 1; }
+
+/* 🌐 OFFLINE FALLBACK: Гарантирует работу сетки и скрытие элементов без CDN */
+.hidden { display: none !important; } .flex { display: flex; } .flex-col { flex-direction: column; } .items-center { align-items: center; } .justify-center { justify-content: center; } .justify-between { justify-content: space-between; } .gap-1 { gap: 0.25rem; } .gap-2 { gap: 0.5rem; } .gap-3 { gap: 0.75rem; } .gap-4 { gap: 1rem; } .grid { display: grid; } .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .h-screen { height: 100vh; } .w-full { width: 100%; } .text-center { text-align: center; } .text-xs { font-size: 0.75rem; } .text-sm { font-size: 0.875rem; } .font-bold { font-weight: 700; } .font-semibold { font-weight: 600; } .p-3 { padding: 0.75rem; } .p-4 { padding: 1rem; } .m-0 { margin: 0; } .mb-1 { margin-bottom: 0.25rem; } .mb-2 { margin-bottom: 0.5rem; } .mb-3 { margin-bottom: 0.75rem; } .mt-1 { margin-top: 0.25rem; } .mt-2 { margin-top: 0.5rem; } .mt-3 { margin-top: 0.75rem; } .bg-slate-900 { background-color: #0f172a; } .bg-slate-800 { background-color: #1e293b; } .text-white { color: #fff; } .text-slate-500 { color: #64748b; } .text-sky-400 { color: #38bdf8; } .border-b { border-bottom-width: 1px; } .border-slate-700 { border-color: #334155; } .rounded-lg { border-radius: 0.5rem; } .px-5 { padding-left: 1.25rem; padding-right: 1.25rem; } .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; } .overflow-hidden { overflow: hidden; } .overflow-y-auto { overflow-y: auto; } .flex-1 { flex: 1 1 0%; } .flex-shrink-0 { flex-shrink: 0; } .space-y-2 > * + * { margin-top: 0.5rem; } .space-y-3 > * + * { margin-top: 0.75rem; } .pr-1 { padding-right: 0.25rem; } .pr-5 { padding-right: 1.25rem; } .absolute { position: absolute; } .top-1\.5 { top: 0.375rem; } .right-2 { right: 0.5rem; } .leading-none { line-height: 1; } .bg-slate-800\/50 { background: rgba(30,41,59,0.5); } .bg-slate-800\/30 { background: rgba(30,41,59,0.3); } .bg-slate-800\/40 { background: rgba(30,41,59,0.4); } .border { border-width: 1px; } .border-slate-700\/50 { border-color: rgba(51,65,85,0.5); } .border-slate-700\/40 { border-color: rgba(51,65,85,0.4); }
+</style>
+</head>
+<body class="h-screen flex flex-col">
+<header class="h-12 border-b border-slate-700 flex items-center justify-between px-5 bg-slate-900 z-30 flex-shrink-0">
+<div class="flex items-center gap-4">
+<span class="text-lg font-bold tracking-tight text-white">Print In <span class="text-sky-400 font-light">calculator</span></span>
+<input id="clientName" type="text" placeholder="👤 Kliento pavadinimas / įmonė" class="bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500/50 outline-none transition w-52">
+</div>
+<div class="flex items-center gap-3">
+<div class="flex gap-1 bg-slate-800 p-1 rounded-lg">
+<button onclick="CalcApp.setLang('lt')" class="px-2 py-0.5 text-xs rounded transition bg-sky-600 text-white" id="btn-lt">LT</button>
+<button onclick="CalcApp.setLang('en')" class="px-2 py-0.5 text-xs rounded transition" id="btn-en">EN</button>
+</div>
+<button onclick="CalcApp.toggleModal(true)" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition">📖 Kainos</button>
+</div>
+</header>
+<main class="flex-1 p-4 overflow-hidden">
+<div class="grid grid-cols-3 gap-4 h-full">
+<!-- 1. MEDŽIAGOS IR PARAMETRAI -->
+<div class="glass-panel">
+<div class="col-header" data-i18n="col1">1. Medžiagos ir parametrai</div>
+<div class="col-content space-y-3 text-xs overflow-y-auto">
+<div>
+<label class="calc-label-sm" data-i18n="category">Kategorija</label>
+<select id="category" onchange="CalcApp.updateMaterials()" class="calc-input-sm">
+<option value="">— Pasirinkti —</option>
+<option value="spauda">🖨️ Didelio Formato Spauda</option>
+<option value="pleveles">🖨️ Plačiaformatė spauda</option>
+<option value="sublimacija">🧵 Spauda ant tekstilės ir sublimacija</option>
+<option value="rigid">🧱 Kietos Medžiagos</option>
+<option value="kartonas">📦 Kartonas</option>
+<option value="services">🔧 Paslaugos / Procesai</option>
+</select>
+</div>
+<div>
+<label class="calc-label-sm" data-i18n="material">Medžiaga / Procesas</label>
+<select id="material" onchange="CalcApp.updateMaterialOptions()" class="calc-input-sm">
+<option value="">— Pirmiausia pasirinkite kategoriją —</option>
+</select>
+<div id="filmFinishWrap" class="hidden mt-1 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="calc-label-sm" data-i18n="lbl_surface">Paviršius / Finish</label>
+<div class="flex gap-4 mt-1">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="filmMatt" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onFilmFinishChange('matt')"> <span data-i18n="chk_filmMatt">Matinis (Matt)</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="filmGloss" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onFilmFinishChange('gloss')"> <span data-i18n="chk_filmGloss">Blizgus (Gloss)</span></label>
+</div>
+</div>
+<div id="block280Wrap" class="hidden mt-1 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="block280Black" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> <span data-i18n="chk_block280black">Nugarinė pusė juoda</span></label>
+</div>
+<div id="aluColorWrap" class="hidden mt-1 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="calc-label-sm" data-i18n="lbl_colorFinish">Spalva / Finish</label>
+<div class="flex gap-4 mt-1">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="aluSilver" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onAluColorChange('silver')"> <span data-i18n="chk_silver">🩶 Sidabrinis</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="aluGold" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onAluColorChange('gold')"> <span data-i18n="chk_gold">🟡 Auksinis</span></label>
+</div>
+</div>
+<div id="microColorWrap" class="hidden mt-1 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="calc-label-sm" data-i18n="lbl_kartonColor">Kartonos spalva</label>
+<div class="flex gap-4 mt-1">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="microBaltas" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('microBaltas','microRudas')"> <span data-i18n="chk_whiteWhite">Baltas/Baltas</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="microRudas" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('microRudas','microBaltas')"> <span data-i18n="chk_brownBrown">Rudas/Rudas</span></label>
+</div>
+</div>
+<div id="swedboardWrap" class="hidden mt-1 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="calc-label-sm" data-i18n="chk_thickness">Storis</label>
+<div class="flex gap-4 mt-1">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="swed10" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('swed10','swed16')"> 10mm (17 €/m²)</label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="swed16" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('swed16','swed10')"> 16mm (22 €/m²)</label>
+</div>
+</div>
+<div id="serimatWrap" class="hidden mt-1 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="calc-label-sm" data-i18n="chk_thickness">Storis</label>
+<div class="flex gap-4 mt-1">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="serimat125" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('serimat125','serimat200')"> 1,25mm (4 €/m²)</label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="serimat200" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('serimat200','serimat125')"> 2mm (6 €/m²)</label>
+</div>
+</div>
+<div id="invercoteWrap" class="hidden mt-1 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="calc-label-sm" data-i18n="chk_weight">Svoris</label>
+<div class="flex gap-col mt-1 gap-2">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="inv240" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('inv240','inv300','inv350')"> 240gsm (1,25 €/m²)</label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="inv300" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('inv300','inv240','inv350')"> 300gsm (1,5 €/m²)</label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="inv350" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('inv350','inv240','inv300')"> 350gsm (1,8 €/m²)</label>
+</div>
+</div>
+<div id="flagAddonWrap" class="hidden mt-1 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="flagReklamine" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> <span data-i18n="chk_flagReklamine">Reklamines veliavos (14 €/m²)</span></label>
+</div>
+<div id="rollupMontavWrap" class="hidden mt-1 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="rollupMontav" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> <span data-i18n="chk_montav">Montavimas į konstrukciją (+4 €)</span></label>
+</div>
+<div id="filmUvWrap" class="hidden mt-1 p-1.5 rounded bg-slate-800/40 border border-slate-700/50 space-y-2">
+<div>
+<label class="calc-label-sm" data-i18n="lbl_filmType">Plėvelės tipas</label>
+<div class="flex gap-4 mt-1">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="filmUvSkaidri" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('filmUvSkaidri','filmUvBalta')"> <span data-i18n="chk_skaidri">Skaidri</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="filmUvBalta" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('filmUvBalta','filmUvSkaidri')"> <span data-i18n="chk_balta">Balta</span></label>
+</div>
+</div>
+<div>
+<label class="calc-label-sm" data-i18n="lbl_surface">Paviršius</label>
+<div class="flex gap-4 mt-1">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="filmUvMatt" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('filmUvMatt','filmUvGloss')"> <span data-i18n="chk_filmMatt">Matinis (Matt)</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="filmUvGloss" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onCheckExclusive('filmUvGloss','filmUvMatt')"> <span data-i18n="chk_filmGloss">Blizgus (Gloss)</span></label>
+</div>
+</div>
+</div>
+</div>
+<div id="printTypeWrap" class="hidden"><label class="calc-label-sm" data-i18n="printType">Spaudos Tipas</label><select id="printType" class="calc-input-sm trigger-calc"><option value="4+0">4+0 (Viena pusė)</option><option value="4+4">4+4 (Abi pusės)</option></select></div>
+<div id="pvcThicknessWrap" class="hidden"><label class="calc-label-sm" data-i18n="pvcThickness">PVC Storis (mm)</label><input type="number" id="pvcThickness" min="1" max="19" value="3" class="calc-input-sm trigger-calc"><div class="text-[10px] text-slate-500 mt-0.5" data-i18n="pvcNote">Bazinė = storis × 3 €/m²</div></div>
+<div id="rigidPrintWrap" class="hidden"><label class="calc-label-sm" data-i18n="rigidPrint">UV / Spaudos Priedas</label><select id="rigidPrint" class="calc-input-sm trigger-calc"><option value="0">Be spaudos</option><option value="10">CMYK 4+0 — vienpusė (+10)</option><option value="20">CMYK 4+4 — dvipusė (+20)</option><option value="18">CMYK+W 5+0 — vienpusė (+18)</option><option value="36">CMYK+W 5+5 — dvipusė (+36)</option></select>
+<div id="rigidExtrasWrap" class="hidden mt-2 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<div class="flex flex-wrap gap-3">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="rigidNeon" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> <span data-i18n="rigidNeon">Neono spalvos (+10)</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="rigidWhite" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> <span data-i18n="rigidWhite">Balta spalva (+10)</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="rigidBraille" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> <span data-i18n="rigidBraille">Iškili / Brailio (+100)</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="rigidVarnish" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> <span data-i18n="rigidVarnish">Skaidrus lakas (+10)</span></label>
+</div>
+</div>
+</div>
+<div id="acrylicWrap" class="hidden space-y-2"><div><label class="calc-label-sm" data-i18n="acrType">Acrylic Tipas</label><select id="acrylicType" class="calc-input-sm trigger-calc"><option value="clear">Clear</option><option value="white_opaque">White Opaque</option><option value="milk_white">Milk White</option></select></div><div><label class="calc-label-sm" data-i18n="acrThick">Acrylic Storis (mm)</label><select id="acrylicThickness" class="calc-input-sm trigger-calc"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="10">10</option></select></div></div>
+<div id="cardboardWrap" class="hidden space-y-2 mt-2 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="calc-label-sm" data-i18n="cuttingMethod">Pjovimo metodas</label>
+<select id="cuttingMethod" class="calc-input-sm trigger-calc">
+<option value="none" data-i18n="noCutting">— Be pjovimo —</option>
+<option value="area" data-i18n="cutPerArea">Pagal plotą (3.50 €/m²)</option>
+<option value="linear" data-i18n="cutPerLinear">Pagal ilgį (pogoniniai metrai)</option>
+</select>
+<div id="linearCutWrap" class="hidden mt-1">
+<label class="calc-label-sm" data-i18n="linearCutLen">Reikalingas pjovimo ilgis (mm)</label>
+<input type="number" id="linearCutLength" min="0" value="0" class="calc-input-sm trigger-calc">
+</div>
+</div>
+<!-- 🖨️ UV/LATEX PASLAUGŲ PARINKTYS (ATSTATYTA) -->
+<div id="uvServiceWrap" class="hidden space-y-2 mt-2 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="calc-label-sm" data-i18n="uvPrintType">UV/Latex Spaudos Tipas</label>
+<select id="uvServicePrintType" class="calc-input-sm trigger-calc">
+<option value="0">— Be spaudos —</option>
+<option value="10">CMYK 4+0 — vienpusė (10)</option>
+<option value="20">CMYK 4+4 — dvipusė (20)</option>
+<option value="18">CMYK+W 5+0 — vienpusė (18)</option>
+<option value="36">CMYK+W 5+5 — dvipusė (36)</option>
+</select>
+<div class="flex flex-wrap gap-3 mt-1">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="uvNeon" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> <span data-i18n="uvNeon">Neono spalvos (+10)</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="uvWhite" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> <span data-i18n="uvWhite">Balta spalva (+10)</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="uvBraille" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> <span data-i18n="uvBraille">Iškili / Brailio (+100)</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="uvVarnish" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> <span data-i18n="uvVarnish">Skaidrus lakas (+10)</span></label>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-2 pt-1 border-t border-slate-700/50">
+<div><label class="calc-label-sm" data-i18n="width">Plotis (mm)</label><input type="number" id="width" min="1" value="1000" class="calc-input-sm trigger-calc"></div>
+<div><label class="calc-label-sm" data-i18n="height">Aukštis (mm)</label><input type="number" id="height" min="1" value="1000" class="calc-input-sm trigger-calc"></div>
+<div><label class="calc-label-sm" data-i18n="quantity">Kiekis</label><input type="number" id="quantity" min="1" value="1" class="calc-input-sm trigger-calc"></div>
+</div>
+<div>
+<label class="calc-label-sm" data-i18n="services">Papildomos Paslaugos</label>
+<div id="services" class="flex flex-wrap gap-1.5 mt-1"></div>
+<div id="millingThickWrap" class="hidden mt-1 p-1.5 rounded bg-slate-800/40 border border-slate-700/50"><label class="calc-label-sm" data-i18n="millThick">Storis (mm) frezavimui</label><select id="millingThickness" class="calc-input-sm trigger-calc"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="10">10</option></select><div class="text-[10px] text-slate-500 mt-0.5" data-i18n="millRateNote">≤3mm: 1€/m | ≤5mm: 1.5€/m | >5mm: 2€/m</div></div>
+<div id="laminateWrap" class="hidden mt-2 p-1.5 rounded bg-slate-800/40 border border-slate-700/50 space-y-2">
+<div><label class="calc-label-sm" data-i18n="laminateType">Pasirinkite Laminatą</label>
+<select id="laminateType" class="calc-input-sm trigger-calc mb-2" onchange="CalcApp.checkLamWrap(); CalcApp.updateLivePreview();"><option value="0">— Nėra —</option><option value="2">Ekonominis (+2)</option><option value="5">2D Auto (+5)</option><option value="10">3D Auto (+10)</option><option value="8">Neslidus grindų laminatas (+8)</option></select>
+</div>
+<div id="lamFinishCheckWrap" class="hidden mt-1">
+<label class="calc-label-sm" data-i18n="lamFinishType">Paviršius / Finish</label>
+<div class="flex gap-4 mt-1">
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="lamMatt" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onLamFinishChange('matt')"> <span data-i18n="chk_filmMatt">Matinis (Matt)</span></label>
+<label class="flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400"><input type="checkbox" id="lamGloss" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" onchange="CalcApp.onLamFinishChange('gloss')"> <span data-i18n="chk_filmGloss">Blizgus (Gloss)</span></label>
+</div>
+</div>
+</div>
+<div id="weldingLengthWrap" class="hidden mt-2 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="calc-label-sm" data-i18n="weldingLength">Litavimo ilgis (mm)</label>
+<input type="number" id="weldingLength" min="0" value="0" class="calc-input-sm trigger-calc">
+</div>
+<div id="sewingLengthWrap" class="hidden mt-2 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
+<label class="calc-label-sm">Siuvimo ilgis (mm) <span class="text-slate-500 font-normal" data-i18n="lbl_sewing0">— 0 = perimetras</span></label>
+<input type="number" id="sewingLength" min="0" value="0" class="calc-input-sm trigger-calc">
+</div>
+</div>
+
+</div>
+</div>
+<!-- 2. DABARTINIS SKAIČIAVIMAS -->
+<div class="glass-panel">
+<div class="col-header" data-i18n="col2">2. Dabartinis skaičiavimas</div>
+<div class="col-content p-3">
+<button type="button" onclick="CalcApp.addToQuote()" class="btn-calc btn-add mb-3 font-medium flex items-center justify-center gap-2 flex-shrink-0" data-i18n="addToQuote">
+➕ Įtraukti į sąmatą
+</button>
+<div id="currentCalcPreview" class="space-y-2 flex-1 overflow-y-auto pr-1">
+<p class="text-slate-500 text-center py-8 italic">Pasirinkite medžiagą ir parametrus...</p>
+</div>
+</div>
+</div>
+<!-- 3. GALUTINĖ SĄMATA -->
+<div class="glass-panel">
+<div class="col-header" data-i18n="col3">3. Galutinė sąmata</div>
+<div class="col-content p-3">
+<div id="quoteTotal" class="quote-total hidden mb-3">
+<div class="text-sm opacity-90 mb-1" data-i18n="quoteTotal">Visa Sąmata:</div>
+<div class="quote-total-amount" id="totalAmount">0.00 €</div>
+<div id="vatLine" class="hidden mt-1 text-xs space-y-0.5">
+<div class="flex justify-between opacity-70"><span data-i18n="scr_exVat">Kaina be PVM:</span><span id="priceExVat">0.00 €</span></div>
+<div class="flex justify-between opacity-70"><span>+21% PVM:</span><span id="vatAmount">0.00 €</span></div>
+<div class="flex justify-between font-semibold text-sky-300 border-t border-slate-600 pt-1 mt-1"><span data-i18n="scr_incVat">Kaina su PVM:</span><span id="priceIncVat">0.00 €</span></div>
+</div>
+<div id="minNote" class="text-xs opacity-80 mt-1 hidden" data-i18n="minApplied">(Taikytas minimalus užsakymas 15 €)</div>
+</div>
+<div class="flex gap-2 mb-3 flex-shrink-0">
+<button type="button" onclick="CalcApp.clearQuote()" id="clearQuoteBtn" class="btn-calc btn-clear hidden text-sm flex-1" data-i18n="clearQuote">🗑️ Išvalyti</button>
+<button type="button" onclick="CalcApp.exportPDF()" id="pdfBtn" class="btn-calc btn-pdf hidden text-sm flex-1" data-i18n="exportPdf">📄 PDF</button>
+</div>
+<div class="flex-1 overflow-y-auto pr-1 space-y-2">
+<div id="quoteItems" class="space-y-2"></div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<div id="priceModal" class="modal" onclick="if(event.target===this)CalcApp.toggleModal(false)">
+<div class="modal-content">
+<button class="close-modal" onclick="CalcApp.toggleModal(false)">✕</button>
+<h2 class="text-lg font-semibold text-white mb-3" data-i18n="priceRefTitle">📖 Bazinių Kainų Lentelė</h2>
+<div id="refContent" class="text-sm"></div>
+</div>
+</div>
+<div id="print-area"></div>
+<!-- 🔐 LOGIN MODAL -->
+<div id="authModal" class="auth-overlay">
+<div class="auth-box">
+<h2 class="auth-title">🔐 Print In</h2>
+<p class="auth-sub">Įveskite prisijungimo duomenis</p>
+<div id="loginForm">
+<div class="auth-field">
+<label>Vartotojo ID</label>
+<input type="text" id="authId" placeholder="print in" autocomplete="off">
+</div>
+<div class="auth-field">
+<label>Slaptažodis</label>
+<input type="password" id="authPass" placeholder="print in" autocomplete="off">
+</div>
+<p id="authError" class="auth-error">Neteisingi duomenys. Bandykite dar kartą.</p>
+<button type="button" id="loginBtn" class="btn-calc btn-add">Prisijungti</button>
+</div>
+</div>
+</div>
+
+<!-- 🔒 LOCKED AUTH MODULE — DO NOT MODIFY -->
+<script>
+(function() {
+    'use strict';
+    const AUTH_KEY = 'printin_auth';
+    const modal = document.getElementById('authModal');
+    const err = document.getElementById('authError');
+    const idEl = document.getElementById('authId');
+    const passEl = document.getElementById('authPass');
+
+    // 🟢 OFFLINE SAFE: Защита от SecurityError в file://
+    let isAuth = false;
+    try { isAuth = sessionStorage.getItem(AUTH_KEY) === '1'; } catch(e) {}
+    if (isAuth) modal.classList.add('hidden');
+
+    document.getElementById('loginBtn').addEventListener('click', doLogin);
+    [idEl, passEl].forEach(el => el.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); }));
+    function doLogin() {
+        const inputId = idEl.value.trim().toLowerCase();
+        const inputPass = passEl.value;
+        if (inputId === 'print in' && inputPass === 'print in') {
+            try { sessionStorage.setItem(AUTH_KEY, '1'); } catch(e) {}
+            modal.classList.add('hidden'); err.classList.remove('show');
+        } else {
+            err.classList.add('show'); passEl.value = ''; passEl.focus();
+            setTimeout(() => err.classList.remove('show'), 2500);
+        }
+    }
+})();
+</script>
+<!-- 🔒 END LOCKED AUTH MODULE -->
+
+<script>
+// 🟢 OFFLINE SAFE STORAGE: Graceful fallback for localStorage
+const SafeStorage = {
+    _mem: {},
+    _test() { try { localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; } catch(e) { return false; } },
+    _ok: false,
+    getItem(k) { return this._ok ? localStorage.getItem(k) : (this._mem[k] || null); },
+    setItem(k,v) { try { if(this._ok) localStorage.setItem(k,v); else this._mem[k]=String(v); } catch(e) { this._mem[k]=String(v); } },
+    removeItem(k) { try { if(this._ok) localStorage.removeItem(k); else delete this._mem[k]; } catch(e) { delete this._mem[k]; } }
+};
+SafeStorage._ok = SafeStorage._test();
+
+const Utils = {
+round: (n, d = 2) => Math.round((n + Number.EPSILON) * 10**d) / 10**d,
+uuid: () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 9))
+};
+const StorageService = {
+getHistory: () => { try { return JSON.parse(SafeStorage.getItem('calcHistory') || '[]'); } catch(e) { return []; } },
+saveHistory: (h) => SafeStorage.setItem('calcHistory', JSON.stringify(h.slice(0, 50))),
+getQuotes: () => { try { return JSON.parse(SafeStorage.getItem('calcQuotes') || '[]'); } catch(e) { return []; } },
+saveQuotes: (q) => SafeStorage.setItem('calcQuotes', JSON.stringify(q))
+};
+const ApiService = {
+async saveQuote(quoteData) { const c=StorageService.getQuotes(); c.unshift(quoteData); if(c.length>100)c.pop(); StorageService.saveQuotes(c); return Promise.resolve({status:'saved', id:quoteData.id}); },
+async syncData() { return Promise.resolve({status:'synced', source:'local'}); }
+};
+const Config = {
+cuttingLinearPrice: 0.40,
+translations: {
+lt: {
+col1:"1. Medžiagos ir parametrai", col2:"2. Dabartinis skaičiavimas", col3:"3. Galutinė sąmata", category:"Kategorija", select:"— Pasirinkti —", material:"Medžiaga / Procesas", printType:"Spaudos Tipas", pvcThickness:"PVC Storis (mm)", pvcNote:"Bazinė = storis × 3 €/m²", rigidPrint:"UV / Spaudos Priedas", acrType:"Acrylic Tipas", acrThick:"Acrylic Storis (mm)", millThick:"Storis (mm) frezavimui", millRateNote:"≤3mm: 1€/m | ≤5mm: 1.5€/m | >5mm: 2€/m", cuttingMethod:"Pjovimo metodas", noCutting:"— Be pjovimo —", cutPerArea:"Pagal plotą (3.50 €/m²)", cutPerLinear:"Pagal ilgį (pogoniniai metrai)", linearCutLen:"Reikalingas pjovimo ilgis (mm)", uvPrintType:"UV/Latex Spaudos Tipas", uvNeon:"Neono spalvos (+10)", uvWhite:"Balta spalva (+10)", uvBraille:"Iškili / Brailio (+100)", uvVarnish:"Skaidrus lakas (+10)", rigidNeon:"Neono spalvos (+10)", rigidWhite:"Balta spalva (+10)", rigidBraille:"Iškili / Brailio (+100)", rigidVarnish:"Skaidrus lakas (+10)", width:"Plotis (mm)", height:"Aukštis (mm)", quantity:"Kiekis (vnt)", services:"Papildomos Paslaugos", laminateType:"Pasirinkite Laminatą", lamFinishType:"Paviršius / Finish", lam_matte:"(Matinis)", lam_gloss:"(Blizgus)", addToQuote:"➕ Įtraukti į sąmatą", clearQuote:"🗑️ Išvalyti", exportPdf:"📄 PDF", quoteTotal:"Visa Sąmata:", minApplied:"⚠️ Taikomas minimalaus užsakymo mokestis 15 €", priceRefTitle:"📖 Bazinių Kainų Lentelė", selectMaterial:"⚠️ Pasirinkite medžiagą", validDims:"⚠️ Įveskite matmenis", removeItem:"Pašalinti?", clearConfirm:"Ar tikrai išvalyti?", quoteEmpty:"Sąmata tuščia", breakdownTitle:"📋 Detalus skaičiavimas (1 vnt.)", posTotal:"💰 Suma už", unitQty:"vnt", perM2:"€/m²", perM:"€/m", pricePerUnit:"💡 Kaina už 1 vnt.:", millStandalone:"🌀 CNC Frezavimas", noHistory:"Nėra istorijos", commercialProposal:"Komercinis Pasiūlymas", lam_econ:"(Ekonominis)", lam_2d:"(2D Auto)", lam_3d:"(3D Auto)", lam_antislip:"(Neslidus grindų)", opt_noLam:"— Nėra —", svc_cutting:"✂️ Pjovimas peiliu", svc_milling:"🌀 CNC frezavimas", svc_grommets:"🔘 Kniedės", svc_plotting:"🎨 Ploteris", svc_lamination:"✨ Laminavimas", svc_silicone:"🧵 Silikoninė juostele", svc_silicone_edge:"🧵 Silikoninė juostele", svc_sewing:"🪡 Siuvimas", svc_calendering:"♨️ Audinių sublimavimas", svc_uv:"🖨️ UV Priedas", svc_welding:"🔥 Litavimas", weldingLength:"Litavimo ilgis (mm)",
+cat_spauda:"🖨️ Didelio Formato Spauda", cat_pleveles:"🖨️ Plačiaformatė spauda", cat_sublimacija:"🧵 Spauda ant tekstilės ir sublimacija", cat_rigid:"🧱 Kietos Medžiagos", cat_kartonas:"📦 Kartonas", cat_services:"🔧 Paslaugos / Procesai", cat_select:"— Pasirinkti —",
+opt_noPrint:"Be spaudos", opt_1side:"vienpusė", opt_2side:"dvipusė",
+chk_block280black:"Nugarinė pusė juoda", chk_silver:"🩶 Sidabrinis", chk_gold:"🟡 Auksinis", chk_whiteWhite:"Baltas/Baltas", chk_brownBrown:"Rudas/Rudas", chk_thickness:"Storis", chk_weight:"Svoris", chk_flagReklamine:"Reklamines veliavos (14 €/m²)", chk_montav:"Montavimas į konstrukciją (+4 €)", chk_skaidri:"Skaidri", chk_balta:"Balta", chk_filmMatt:"Matinis (Matt)", chk_filmGloss:"Blizgus (Gloss)", chk_lamMatt:"Matinis (Matt)", chk_lamGloss:"Blizgus (Gloss)",
+lbl_sewing0:"— 0 = perimetras", lbl_5mmpick:"5mm: pasirinkite vieną iš dviejų", lbl_colorFinish:"Spalva / Finish", lbl_surface:"Paviršius / Finish", lbl_filmType:"Plėvelės tipas", lbl_kartonColor:"Kartonos spalva",
+pdf_name:"Pavadinimas / Matmenys", pdf_qty:"Kiekis", pdf_price:"Kaina", pdf_total:"Suma", pdf_exVat:"Suma be PVM", pdf_vat:"+21% PVM:", pdf_incVat:"Kaina su PVM:", pdf_footer:"Dokumentas sugeneruotas automatiškai • Print In skaiciavimai", pdf_minOrder:"(Taikytas minimalus užsakymas 15 €)",
+scr_exVat:"Kaina be PVM:", scr_incVat:"Kaina su PVM:",
+lbl_montavInCalc:"Montavimas į konstrukciją", lbl_reklamInCalc:"(Reklamines veliavos)", lbl_perim:"(perimetras)",
+ref_addons:"Papildomai:", ref_rigidUv:"UV Parinktys:", ref_rigidAddons:"Kietoms:", ref_1side:"vienpusė", ref_2side:"dvipusė"
+},
+en: {
+col1:"1. Materials & Options", col2:"2. Current Calculation", col3:"3. Final Quote", category:"Category", select:"— Select —", material:"Material / Process", printType:"Print Type", pvcThickness:"PVC Thickness (mm)", pvcNote:"Base = thick × 3 €/m²", rigidPrint:"UV / Print Add-on", acrType:"Acrylic Type", acrThick:"Acrylic Thickness (mm)", millThick:"Thickness (mm) milling", millRateNote:"≤3mm: 1€/m | ≤5mm: 1.5€/m | >5mm: 2€/m", cuttingMethod:"Cutting method", noCutting:"— No cutting —", cutPerArea:"Per area (3.50 €/m²)", cutPerLinear:"Per linear meter", linearCutLen:"Required cutting length (mm)", uvPrintType:"UV/Latex Print Type", uvNeon:"Neon colors (+10)", uvWhite:"White color (+10)", uvBraille:"Embossed / Braille (+100)", uvVarnish:"Clear varnish (+10)", rigidNeon:"Neon colors (+10)", rigidWhite:"White color (+10)", rigidBraille:"Embossed / Braille (+100)", rigidVarnish:"Clear varnish (+10)", width:"Width (mm)", height:"Height (mm)", quantity:"Quantity (pcs)", services:"Additional Services", laminateType:"Select Laminate", lamFinishType:"Surface / Finish", lam_matte:"(Matte)", lam_gloss:"(Glossy)", addToQuote:"➕ Add to Quote", clearQuote:"🗑️ Clear", exportPdf:"📄 PDF", quoteTotal:"Total Quote:", minApplied:"⚠️ Minimum order fee of 15 € applies", priceRefTitle:"📖 Base Price Table", selectMaterial:"⚠️ Select material", validDims:"⚠️ Enter dimensions", removeItem:"Remove?", clearConfirm:"Confirm clear?", quoteEmpty:"Quote is empty", breakdownTitle:"📋 Detailed calc (1 pc)", posTotal:"💰 Total for", unitQty:"pcs", perM2:"€/m²", perM:"€/m", pricePerUnit:"💡 Price per 1 pc.:", millStandalone:"🌀 CNC Milling", noHistory:"No history", commercialProposal:"Commercial Proposal", lam_econ:"(Economic)", lam_2d:"(2D Auto)", lam_3d:"(3D Auto)", lam_antislip:"(Anti-slip floor)", opt_noLam:"— None —", svc_cutting:"✂️ Knife Cut", svc_milling:"🌀 CNC Milling", svc_grommets:"🔘 Grommets", svc_plotting:"🎨 Plotter", svc_lamination:"✨ Lamination", svc_silicone:"🧵 Silicone tape", svc_silicone_edge:"🧵 Silicone tape", svc_sewing:"🪡 Sewing", svc_calendering:"♨️ Calendering", svc_uv:"🖨️ UV Add-on", svc_welding:"🔥 Welding", weldingLength:"Welding length (mm)",
+cat_spauda:"🖨️ Large Format Print", cat_pleveles:"🖨️ Wide Format Print", cat_sublimacija:"🧵 Textile & Sublimation", cat_rigid:"🧱 Rigid Materials", cat_kartonas:"📦 Cardboard", cat_services:"🔧 Services / Processes", cat_select:"— Select —",
+opt_noPrint:"No print", opt_1side:"single-sided", opt_2side:"double-sided",
+chk_block280black:"Black back side", chk_silver:"🩶 Silver", chk_gold:"🟡 Gold", chk_whiteWhite:"White/White", chk_brownBrown:"Brown/Brown", chk_thickness:"Thickness", chk_weight:"Weight", chk_flagReklamine:"Advertising flags (14 €/m²)", chk_montav:"Mounting to frame (+4 €)", chk_skaidri:"Clear", chk_balta:"White", chk_filmMatt:"Matte (Matt)", chk_filmGloss:"Glossy (Gloss)", chk_lamMatt:"Matte (Matt)", chk_lamGloss:"Glossy (Gloss)",
+lbl_sewing0:"— 0 = perimeter", lbl_5mmpick:"5mm: select one option", lbl_colorFinish:"Color / Finish", lbl_surface:"Surface / Finish", lbl_filmType:"Film type", lbl_kartonColor:"Cardboard color",
+pdf_name:"Name / Dimensions", pdf_qty:"Qty", pdf_price:"Price", pdf_total:"Total", pdf_exVat:"Price excl. VAT", pdf_vat:"+21% VAT:", pdf_incVat:"Price incl. VAT:", pdf_footer:"Document generated automatically • Print In calculator", pdf_minOrder:"(Minimum order 15 € applied)",
+scr_exVat:"Price excl. VAT:", scr_incVat:"Price incl. VAT:",
+lbl_montavInCalc:"Mounting to frame", lbl_reklamInCalc:"(Advertising flag)", lbl_perim:"(perimeter)",
+ref_addons:"Add-ons:", ref_rigidUv:"UV Options:", ref_rigidAddons:"Rigid extras:", ref_1side:"single-sided", ref_2side:"double-sided"
+}
+},
+materials: {
+spauda: [
+{id:'tentas_500',name:{lt:'Lietas tentas 500g. Plotis iki 5,1m',en:'Cast banner 500g. Width up to 5.1m'},price:5.50,type:'banner',maxWidth:5100},
+{id:'blockout',name:{lt:'Blockout tentas. Plotis iki 3,2m',en:'Blockout banner. Width up to 3.2m'},price40:10.00,price44:15.00,type:'dual',maxWidth:3200},
+{id:'mesh',name:{lt:'Mesh. Plotis iki 5m',en:'Mesh. Width up to 5m'},price:6.50,type:'banner',maxWidth:5000},
+{id:'backlight_tent',name:{lt:'Backlit tentas. Plotis iki 5m',en:'Backlit banner. Width up to 5m'},price40:15.00,price44:21.00,type:'dual',maxWidth:5000}
+],
+pleveles: [
+{id:'rollup',name:{lt:'Premium Roll-up',en:'Premium Roll-up'},price:10.00,type:'banner'},
+{id:'blueback',name:{lt:'Blueback popierius',en:'Blueback paper'},price:5.00,type:'paper'},
+{id:'paper_satin',name:{lt:'Satino popierius 220g',en:'Satin paper 220g'},price:6.00,type:'paper'},
+{id:'film_uv',name:{lt:'Lipni plėvelė UV spaudai',en:'Adhesive film for UV print'},price:2.50,type:'film_uv'},
+{id:'film_self',name:{lt:'Lipni plėvelė',en:'Self-adhesive vinyl'},price:6.00,type:'film'},
+{id:'film_auto',name:{lt:'Lipni plėvelė auto (2D)',en:'Car wrap vinyl (2D)'},price:14.00,type:'film'},
+{id:'film_perforated',name:{lt:'Perforuota plėvelė langu grafikai',en:'Perforated window vinyl'},price:15.00,type:'film'},
+{id:'film_backlight',name:{lt:'Backlit lipni plėvelė',en:'Backlit adhesive film'},price:17.00,type:'film'},
+{id:'canvas_460',name:{lt:'Drobė 460g',en:'Canvas 460g'},price:20.00,type:'canvas'},
+{id:'canvas_frame',name:{lt:'Drobė su porėmiu',en:'Canvas with stretcher frame'},price:40.00,type:'canvas'}
+],
+sublimacija: [
+{id:'sub_block360',name:{lt:'Blockout audinys 360gsm dvipusei spaudai. Plotis iki 3,15m',en:'Blockout fabric 360gsm double-sided print. Width up to 3.15m'},price40:28.00,price44:37.00,type:'dual'},
+{id:'sub_backlight',name:{lt:'Backlit audinys. Plotis iki 3,15m',en:'Backlit fabric. Width up to 3.15m'},price:21.00,type:'single'},
+{id:'sub_banner',name:{lt:'Banerinis audinys. Plotis iki 3,20m',en:'Banner fabric. Width up to 3.20m'},price:13.00,type:'single'},
+{id:'sub_block280',name:{lt:'Blockout audinys 280gsm. Plotis iki 3,15m',en:'Blockout fabric 280gsm. Width up to 3.15m'},price:16.00,type:'single'},
+{id:'sub_flag',name:{lt:'Veliavinis audinys. Plotis iki 3,10m',en:'Flag fabric. Width up to 3.10m'},price:10.00,type:'single'},
+{id:'sub_satin',name:{lt:'Satinete blizgus audinys. Plotis iki 3,10m',en:'Satin glossy fabric. Width up to 3.10m'},price:15.00,type:'single'},
+{id:'sub_taft',name:{lt:'Taftas lengvas audinys. Plotis iki 1,50m',en:'Taffeta lightweight fabric. Width up to 1.50m'},price:17.00,type:'single'},
+{id:'sub_elastic',name:{lt:'Tamprus audinys. Plotis iki 3,15m',en:'Stretch fabric. Width up to 3.15m'},price:15.00,type:'single'},
+{id:'sub_paper_print',name:{lt:'Sublimacijos popierius. Plotis iki 1,60m',en:'Sublimation transfer paper. Width up to 1.60m'},price:5.00,type:'single'},
+{id:'sub_calendering',name:{lt:'Audinių sublimavimas',en:'Fabric sublimation (calendering)'},price:2.00,type:'single'}
+],
+rigid: [
+{id:'pvc_1_2',name:{lt:'PVC 1–2 mm',en:'PVC 1–2 mm'},price:6.00,type:'pvc_fixed'},
+{id:'pvc_3_19',name:{lt:'PVC 3–19 mm',en:'PVC 3–19 mm'},type:'pvc_dynamic'},
+{id:'alu_comp',name:{lt:'Aliuminio kompozitas',en:'Aluminium composite'},price:20.00,type:'rigid'},
+{id:'alu_brushed',name:{lt:'Braižytas aliuminio kompozitas',en:'Brushed aluminium composite'},price:30.00,type:'rigid'},
+{id:'stadur_10',name:{lt:'Stadur easyprint 10mm',en:'Stadur easyprint 10mm'},price:22.00,type:'rigid'},
+{id:'priplak',name:{lt:'Priplak 0.8mm',en:'Priplak 0.8mm'},price:9.00,type:'rigid'},
+{id:'acrylic',name:{lt:'Organinis stiklas',en:'Acrylic glass'},type:'acrylic'}
+],
+kartonas: [
+{id:'corrugated_3mm',name:{lt:'3mm Gofruotas kartonas',en:'3mm Corrugated cardboard'},price:2.00,type:'cardboard'},
+{id:'micro_1_5',name:{lt:'Mikrogofruotas 1,5mm kartonas',en:'Micro-corrugated 1.5mm cardboard'},price:2.00,type:'cardboard'},
+{id:'swedboard',name:{lt:'Swedboard koretas kartonas',en:'Swedboard corrugated board'},type:'cardboard'},
+{id:'serimat',name:{lt:'Serimat kartonas',en:'Serimat board'},type:'cardboard'},
+{id:'invercote',name:{lt:'Invercote creato kartonas',en:'Invercote creato board'},type:'cardboard'}
+],
+services: [
+{id:'uv_latex',name:{lt:'UV/Latex spauda',en:'UV/Latex print'},type:'uv_service'},
+{id:'milling_standalone',name:{lt:'🌀 CNC Frezavimas',en:'🌀 CNC Milling'},type:'milling_service'}
+]
+},
+servicesList: [
+{id:'cutting',name:{lt:'✂️ Pjovimas',en:'✂️ Knife Cut'},pricePerM:0.40,unit:'perimeter'},
+{id:'milling',name:{lt:'🌀 CNC frezavimas',en:'🌀 CNC Milling'},pricePerM:1.00,unit:'perimeter'},
+{id:'grommets',name:{lt:'🔘 Kniedės',en:'🔘 Grommets'},pricePerM:1.00,unit:'perimeter'},
+{id:'plotting',name:{lt:'🎨 Ploteris',en:'🎨 Plotter'},pricePerM2:5.00,unit:'area'},
+{id:'lamination',name:{lt:'✨ Laminavimas',en:'✨ Lamination'},pricePerM2:3.00,unit:'area'},
+{id:'silicone_edge',name:{lt:'🧵 Silikoninė juostele',en:'🧵 Silicone tape'},pricePerM:2.50,unit:'perimeter'},
+{id:'sewing',name:{lt:'🪡 Siuvimas',en:'🪡 Sewing'},pricePerM:1.00,unit:'perimeter'},
+{id:'welding',name:{lt:'🔥 Litavimas',en:'🔥 Welding'},price:1.00,unit:'custom'}
+],
+allowedServices: {
+'tentas_500':['cutting','grommets','welding'], 'blockout':['cutting','grommets','welding'],
+'rollup':['cutting'], 'mesh':['cutting','grommets','welding'], 'backlight_tent':['cutting','grommets','welding'],
+'paper_satin':['cutting'], 'blueback':['cutting'], 'film_uv':['cutting','plotting'],
+'film_self':['cutting','plotting','lamination'],
+'film_auto':['cutting','plotting','lamination'], 'film_perforated':['cutting','lamination'],
+'film_backlight':['cutting','plotting','lamination'], 'canvas_460':['cutting'], 'canvas_frame':[],
+'sub_block360':['cutting','silicone_edge','sewing'], 'sub_backlight':['cutting','silicone_edge','sewing'],
+'sub_banner':['cutting','silicone_edge','sewing'], 'sub_block280':['cutting','silicone_edge','sewing'],
+'sub_flag':['cutting','silicone_edge','sewing'], 'sub_satin':['cutting','silicone_edge','sewing'],
+'sub_taft':['cutting','silicone_edge','sewing'], 'sub_elastic':['cutting','silicone_edge','sewing'],
+'sub_paper_print':[], 'sub_calendering':[],
+'pvc_1_2':['cutting'], 'pvc_3_19':['cutting','milling'],
+'corrugated_3mm':[], 'micro_1_5':[], 'swedboard':['cutting'], 'serimat':['cutting'], 'invercote':['cutting'],
+'alu_comp':['milling'], 'alu_brushed':['milling'], 'stadur_10':['cutting'], 'priplak':['cutting'], 'acrylic':['milling'],
+'uv_latex':['milling'], 'milling_standalone':[]
+}
+};
+const CalcApp = {
+currentLang: 'lt', currentMaterial: null, quoteItems: [],
+t(k) { return Config.translations[this.currentLang]?.[k] || k; },
+setLang(l) {
+this.currentLang = l;
+document.querySelectorAll('[id^="btn-"]').forEach(b => b.classList.remove('bg-sky-600','text-white'));
+document.getElementById(`btn-${l}`).classList.add('bg-sky-600','text-white');
+document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = this.t(el.dataset.i18n));
+// Translate category select options
+const catSel = document.getElementById('category');
+if(catSel) catSel.querySelectorAll('option').forEach(o => { if(o.value) { const k='cat_'+o.value; const tr=this.t(k); if(tr!==k) o.textContent=tr; } else { o.textContent=`— ${this.t('select')} —`; } });
+// Translate laminateType options
+const lamSel = document.getElementById('laminateType');
+if(lamSel) { lamSel.options[0].textContent=this.t('opt_noLam'); lamSel.options[1].textContent=`${this.t('lam_econ').replace(/[()]/g,'')} (+2)`; lamSel.options[2].textContent=`2D Auto (+5)`; lamSel.options[3].textContent=`3D Auto (+10)`; lamSel.options[4].textContent=`${this.t('lam_antislip').replace(/[()]/g,'')} (+8)`; }
+const rp = document.getElementById('rigidPrint');
+if(rp) { const noPrint=this.t('opt_noPrint'); const s1=this.t('opt_1side'); const s2=this.t('opt_2side'); rp.options[0].textContent=noPrint; rp.options[1].textContent=`CMYK 4+0 — ${s1} (+10)`; rp.options[2].textContent=`CMYK 4+4 — ${s2} (+20)`; rp.options[3].textContent=`CMYK+W 5+0 — ${s1} (+18)`; rp.options[4].textContent=`CMYK+W 5+5 — ${s2} (+36)`; }
+// Translate uvServicePrintType options
+const uvp = document.getElementById('uvServicePrintType');
+if(uvp) { const noPrint=this.t('opt_noPrint'); const s1=this.t('opt_1side'); const s2=this.t('opt_2side'); uvp.options[0].textContent=`— ${noPrint} —`; uvp.options[1].textContent=`CMYK 4+0 — ${s1} (10)`; uvp.options[2].textContent=`CMYK 4+4 — ${s2} (20)`; uvp.options[3].textContent=`CMYK+W 5+0 — ${s1} (18)`; uvp.options[4].textContent=`CMYK+W 5+5 — ${s2} (36)`; }
+// Re-render material list and quote in new lang
+this.updateMaterials();
+this.renderQuoteItems(); this.generateRefTable();
+},
+getDynamicMillingRate(t) { return Utils.round(t<=3?1.00:t<=5?1.50:2.00); },
+getMatName() {
+if(!this.currentMaterial) return '';
+const nm = this.currentMaterial.name;
+let n = (typeof nm === 'object') ? (nm[this.currentLang] || nm.lt) : nm;
+if(this.currentMaterial.id==='pvc_3_19') n = `PVC ${document.getElementById('pvcThickness').value||3}mm`;
+else if(this.currentMaterial.id==='acrylic') n = `Organinis stiklas ${document.getElementById('acrylicType').value||'clear'} ${document.getElementById('acrylicThickness').value||3}mm`;
+else if(this.currentMaterial.type==='dual') n += ` (${document.getElementById('printType').value})`;
+if(['film_self','film_auto','film_backlight'].includes(this.currentMaterial.id)) {
+if(document.getElementById('filmMatt')?.checked) n += ' (Matt)';
+else if(document.getElementById('filmGloss')?.checked) n += ' (Gloss)';
+}
+if(this.currentMaterial.id==='sub_block280' && document.getElementById('block280Black')?.checked) n += ` (${this.t('chk_block280black')})`;
+if(this.currentMaterial.id==='alu_brushed') {
+if(document.getElementById('aluSilver')?.checked) n += ` (${this.t('chk_silver')})`;
+else if(document.getElementById('aluGold')?.checked) n += ` (${this.t('chk_gold')})`;
+}
+if(this.currentMaterial.id==='micro_1_5') {
+if(document.getElementById('microBaltas')?.checked) n += ' (Baltas/Baltas)';
+else if(document.getElementById('microRudas')?.checked) n += ' (Rudas/Rudas)';
+}
+if(this.currentMaterial.id==='swedboard') {
+n += document.getElementById('swed16')?.checked ? ' 16mm' : ' 10mm';
+}
+if(this.currentMaterial.id==='serimat') {
+n += document.getElementById('serimat200')?.checked ? ' 2mm' : ' 1,25mm';
+}
+if(this.currentMaterial.id==='invercote') {
+if(document.getElementById('inv300')?.checked) n += ' 300gsm';
+else if(document.getElementById('inv350')?.checked) n += ' 350gsm';
+else n += ' 240gsm';
+}
+if(this.currentMaterial.id==='film_uv') {
+if(document.getElementById('filmUvSkaidri')?.checked) n += ' (Skaidri)';
+else if(document.getElementById('filmUvBalta')?.checked) n += ' (Balta)';
+if(document.getElementById('filmUvMatt')?.checked) n += ' (Matt)';
+else if(document.getElementById('filmUvGloss')?.checked) n += ' (Gloss)';
+}
+return n;
+},
+updateMaterials() {
+const c = document.getElementById('category').value, s = document.getElementById('material');
+s.innerHTML = `<option value="">— ${this.t('select')} —</option>`;
+if(!c) return;
+Config.materials[c].forEach(m => { const o=document.createElement('option'); o.value=m.id; o.textContent=(typeof m.name==='object')?(m.name[this.currentLang]||m.name.lt):m.name; s.appendChild(o); });
+this.resetDyn(); this.updateMaterialOptions();
+},
+resetDyn() {
+['printTypeWrap','pvcThicknessWrap','rigidPrintWrap','rigidExtrasWrap','acrylicWrap','millingThickWrap','cardboardWrap','uvServiceWrap','laminateWrap','weldingLengthWrap','sewingLengthWrap','filmFinishWrap','block280Wrap','flagAddonWrap','aluColorWrap','microColorWrap','swedboardWrap','serimatWrap','invercoteWrap','rollupMontavWrap','filmUvWrap']
+.forEach(id => document.getElementById(id)?.classList.add('hidden'));
+document.getElementById('services').innerHTML=''; this.currentMaterial=null; this.updateLivePreview();
+['uvNeon','uvWhite','uvBraille','uvVarnish','rigidNeon','rigidWhite','rigidBraille','rigidVarnish','filmMatt','filmGloss','block280Black','flagReklamine','lamMatt','lamGloss','aluSilver','aluGold','microBaltas','microRudas','swed10','swed16','serimat125','serimat200','inv240','inv300','inv350','rollupMontav','filmUvSkaidri','filmUvBalta','filmUvMatt','filmUvGloss'].forEach(id => { const el=document.getElementById(id); if(el) el.checked=false; });
+document.getElementById('uvServicePrintType').value = '0';
+document.getElementById('sewingLength').value = '0';
+document.getElementById('quantity').value = '1';
+document.getElementById('lamFinishCheckWrap')?.classList.add('hidden');
+},
+updateMaterialOptions() {
+const mid = document.getElementById('material').value, cat = document.getElementById('category').value;
+document.getElementById('quantity').value = '1';
+if(!mid||!cat){ this.resetDyn(); return; }
+this.currentMaterial = Config.materials[cat].find(m=>m.id===mid);
+if(!this.currentMaterial) return;
+const tog = (id, cond) => { const e=document.getElementById(id); if(e) e.classList.toggle('hidden', !cond); };
+tog('printTypeWrap', this.currentMaterial.type==='dual');
+tog('pvcThicknessWrap', this.currentMaterial.type==='pvc_dynamic');
+tog('rigidPrintWrap', cat==='rigid' || cat==='kartonas');
+tog('rigidExtrasWrap', cat==='rigid');
+tog('acrylicWrap', this.currentMaterial.id==='acrylic');
+tog('millingThickWrap', this.currentMaterial.id==='milling_standalone');
+// cardboardWrap handled below
+tog('uvServiceWrap', this.currentMaterial.id==='uv_latex' || this.currentMaterial.id==='film_uv');
+tog('rollupMontavWrap', this.currentMaterial.id==='rollup');
+tog('filmUvWrap', this.currentMaterial.id==='film_uv');
+const isFilmWithFinish = ['film_self','film_auto','film_backlight'].includes(this.currentMaterial.id);
+tog('filmFinishWrap', isFilmWithFinish);
+tog('block280Wrap', this.currentMaterial.id==='sub_block280');
+tog('flagAddonWrap', this.currentMaterial.id==='sub_flag');
+tog('aluColorWrap', this.currentMaterial.id==='alu_brushed');
+tog('cardboardWrap', ['corrugated_3mm','micro_1_5'].includes(this.currentMaterial.id));
+tog('microColorWrap', this.currentMaterial.id==='micro_1_5');
+tog('swedboardWrap', this.currentMaterial.id==='swedboard');
+tog('serimatWrap', this.currentMaterial.id==='serimat');
+tog('invercoteWrap', this.currentMaterial.id==='invercote');
+this.checkLinearCutWrap(); this.updateMaterialPrice(); this.updateServices();
+},
+checkLinearCutWrap() {
+const method = document.getElementById('cuttingMethod')?.value || 'none';
+document.getElementById('linearCutWrap').classList.toggle('hidden', method !== 'linear');
+this.updateLivePreview();
+},
+updateMaterialPrice() {
+if(this.currentMaterial?.type==='pvc_dynamic') this.currentMaterial._currentPrice = (parseFloat(document.getElementById('pvcThickness').value)||3)*3;
+},
+updateServices() {
+const b = document.getElementById('services'); b.innerHTML='';
+document.getElementById('laminateWrap').classList.add('hidden');
+document.getElementById('weldingLengthWrap').classList.add('hidden');
+if(!this.currentMaterial) return;
+
+let effectiveAllowed;
+const isPvc3 = this.currentMaterial.id === 'pvc_3_19';
+if(isPvc3) {
+const th = parseFloat(document.getElementById('pvcThickness').value) || 3;
+if(th < 5) effectiveAllowed = ['cutting'];
+else if(th === 5) effectiveAllowed = ['cutting','milling'];
+else effectiveAllowed = ['milling'];
+} else {
+effectiveAllowed = Config.allowedServices[this.currentMaterial.id] || [];
+}
+
+Config.servicesList.forEach(s => {
+if(effectiveAllowed.includes(s.id)){
+const isLam = s.id === 'lamination';
+const l = document.createElement('label');
+l.className='flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400 bg-slate-800/30 px-1.5 py-1 rounded border border-slate-700/40';
+const priceVal = s.pricePerM || s.pricePerM2 || s.price || 0;
+const svcName = (typeof s.name==='object') ? (s.name[this.currentLang]||s.name.lt) : s.name;
+l.innerHTML=`<input type="checkbox" value="${s.id}" data-price="${priceVal}" data-unit="${s.unit}" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90" ${isLam ? 'onchange="CalcApp.checkLamWrap(); CalcApp.updateLivePreview();"' : ''}> ${svcName}`;
+b.appendChild(l);
+if(s.id==='welding') l.querySelector('input').addEventListener('change', () => this.checkWeldingWrap());
+if(s.id==='sewing') l.querySelector('input').addEventListener('change', () => this.checkSewingWrap());
+if(s.id==='milling') l.querySelector('input').addEventListener('change', () => this.checkMillingWrap());
+}
+});
+
+if(isPvc3) {
+const th = parseFloat(document.getElementById('pvcThickness').value) || 3;
+if(th === 5) {
+const cCb = b.querySelector('input[value="cutting"]');
+const mCb = b.querySelector('input[value="milling"]');
+const note = document.createElement('div');
+note.className='text-[10px] text-slate-400 w-full mt-0.5 px-1';
+note.textContent=this.t('lbl_5mmpick');
+b.appendChild(note);
+if(cCb && mCb) {
+cCb.addEventListener('change', () => { if(cCb.checked) mCb.checked=false; this.updateLivePreview(); });
+mCb.addEventListener('change', () => { if(mCb.checked) cCb.checked=false; this.updateLivePreview(); });
+}
+}
+}
+
+if(this.currentMaterial.id==='sub_paper_print'){
+const l=document.createElement('label');l.className='flex items-center gap-1.5 text-xs cursor-pointer hover:text-sky-400 bg-slate-800/30 px-1.5 py-1 rounded border border-slate-700/40';
+l.innerHTML=`<input type="checkbox" value="calendering_addon" data-price="2.00" data-unit="area" class="trigger-calc rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 scale-90"> ♨️ Audinių sublimavimas (+2)`;
+b.appendChild(l);
+}
+this.checkLamWrap(); this.checkWeldingWrap(); this.checkSewingWrap(); this.checkMillingWrap();
+},
+checkWeldingWrap() {
+const wc = document.querySelector('#services input[value="welding"]'), w = document.getElementById('weldingLengthWrap');
+if(wc && wc.checked) w.classList.remove('hidden'); else { w.classList.add('hidden'); document.getElementById('weldingLength').value='0'; }
+this.updateLivePreview();
+},
+onFilmFinishChange(selected) {
+if(selected==='matt') { document.getElementById('filmGloss').checked=false; }
+else { document.getElementById('filmMatt').checked=false; }
+this.updateLivePreview();
+},
+onAluColorChange(selected) {
+if(selected==='silver') { document.getElementById('aluGold').checked=false; }
+else { document.getElementById('aluSilver').checked=false; }
+this.updateLivePreview();
+},
+onCheckExclusive(checked, ...others) {
+others.forEach(id => { const el=document.getElementById(id); if(el) el.checked=false; });
+this.updateLivePreview();
+},
+checkSewingWrap() {
+const sc = document.querySelector('#services input[value="sewing"]'), w = document.getElementById('sewingLengthWrap');
+if(sc && sc.checked) w.classList.remove('hidden'); else { w.classList.add('hidden'); document.getElementById('sewingLength').value='0'; }
+this.updateLivePreview();
+},
+checkMillingWrap() {
+const mc = document.querySelector('#services input[value="milling"]'), w = document.getElementById('millingThickWrap');
+const isAlu = ['alu_comp','alu_brushed'].includes(this.currentMaterial?.id);
+if(w && this.currentMaterial?.id !== 'milling_standalone') {
+if(mc && mc.checked && !isAlu) w.classList.remove('hidden'); else w.classList.add('hidden');
+}
+this.updateLivePreview();
+},
+onLamFinishChange(selected) {
+if(selected==='matt') { document.getElementById('lamGloss').checked=false; }
+else { document.getElementById('lamMatt').checked=false; }
+this.updateLivePreview();
+},
+checkLamWrap() {
+const lc = document.querySelector('#services input[value="lamination"]'), w = document.getElementById('laminateWrap');
+const nd = this.currentMaterial && ['film_self','film_auto','film_perforated','film_backlight'].includes(this.currentMaterial.id);
+const fcw = document.getElementById('lamFinishCheckWrap');
+if(nd && lc && lc.checked) {
+w.classList.remove('hidden');
+const av = parseFloat(document.getElementById('laminateType').value) || 0;
+if(fcw) fcw.classList.toggle('hidden', av === 0);
+} else {
+w.classList.add('hidden');
+const lt=document.getElementById('laminateType'); if(lt)lt.value='0';
+['lamMatt','lamGloss'].forEach(id => { const el=document.getElementById(id); if(el) el.checked=false; });
+if(fcw) fcw.classList.add('hidden');
+}
+},
+calculateItem() {
+if(!this.currentMaterial) return null;
+const w = parseFloat(document.getElementById('width').value) || 0;
+const h = parseFloat(document.getElementById('height').value) || 0;
+const q = parseInt(document.getElementById('quantity').value) || 1;
+if(w<=0 || h<=0) return null;
+const areaM2 = (w * h) / 1000000;
+const perimM = (w + h) * 2 / 1000;
+const bd = [];
+let mp=0, mn=this.getMatName(), th=0;
+if(this.currentMaterial.type === 'uv_service' || this.currentMaterial.id === 'film_uv') {
+const sel = document.getElementById('uvServicePrintType');
+const uvPrice = parseFloat(sel.value) || 0;
+// For film_uv: show material price first
+if(this.currentMaterial.id === 'film_uv') {
+bd.push({label:mn, qty:Utils.round(areaM2,2), unit:'m²', rate:2.50, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(2.50*areaM2,2)});
+} else {
+bd.push({label:mn, qty:Utils.round(areaM2,2), unit:'m²', rate:0, unitPriceLabel:this.t('perM2'), subtotal:0});
+}
+if(uvPrice > 0) {
+const optText = sel.options[sel.selectedIndex].text;
+const lbl = optText ? optText.replace(/\s*\(.*\)/, '').trim() : `UV/Latex ${uvPrice}€/m²`;
+bd.push({label:lbl, qty:Utils.round(areaM2,2), unit:'m²', rate:uvPrice, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(uvPrice*areaM2,2)});
+}
+if(document.getElementById('uvNeon').checked) bd.push({label:this.t('uvNeon'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
+if(document.getElementById('uvWhite').checked) bd.push({label:this.t('uvWhite'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
+if(document.getElementById('uvBraille').checked) bd.push({label:this.t('uvBraille'), qty:Utils.round(areaM2,2), unit:'m²', rate:100, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(100*areaM2,2)});
+if(document.getElementById('uvVarnish').checked) bd.push({label:this.t('uvVarnish'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
+const millCb = document.querySelector('#services input[value="milling"]');
+if(millCb && millCb.checked) {
+th = parseFloat(document.getElementById('millingThickness').value) || 3;
+const mr = this.getDynamicMillingRate(th);
+bd.push({label:`${this.t('svc_milling')} (${th}mm)`, qty:Utils.round(perimM,2), unit:'m', rate:mr, unitPriceLabel:this.t('perM'), subtotal:Utils.round(mr*perimM,2)});
+}
+const cutCb = document.querySelector('#services input[value="cutting"]');
+if(cutCb && cutCb.checked) {
+bd.push({label:this.t('svc_cutting'), qty:Utils.round(perimM,2), unit:'m', rate:0.40, unitPriceLabel:this.t('perM'), subtotal:Utils.round(0.40*perimM,2)});
+}
+const plotCb = document.querySelector('#services input[value="plotting"]');
+if(plotCb && plotCb.checked) {
+bd.push({label:this.t('svc_plotting'), qty:Utils.round(areaM2,2), unit:'m²', rate:5.00, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(5.00*areaM2,2)});
+}
+return {material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:Utils.round(bd.reduce((s,x)=>s+x.subtotal,0)*q,2)};
+}
+if(this.currentMaterial.type === 'cardboard') {
+const cid = this.currentMaterial.id;
+// Dynamic material price
+if(cid==='corrugated_3mm' || cid==='micro_1_5') mp = 2.00;
+else if(cid==='swedboard') mp = document.getElementById('swed16')?.checked ? 22 : 17;
+else if(cid==='serimat') mp = document.getElementById('serimat200')?.checked ? 6 : 4;
+else if(cid==='invercote') {
+mp = document.getElementById('inv300')?.checked ? 1.5 : document.getElementById('inv350')?.checked ? 1.8 : 1.25;
+}
+bd.push({label:mn, qty:Utils.round(areaM2,2), unit:'m²', rate:mp, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(mp*areaM2,2)});
+// UV print (same for all kartonas)
+const rv=parseFloat(document.getElementById('rigidPrint').value)||0;
+if(rv>0){
+let pl=rv===10?'CMYK 4+0':rv===20?'CMYK 4+4':rv===18?'CMYK+W 5+0':rv===36?'CMYK+W 5+5':'UV';
+bd.push({label:pl, qty:Utils.round(areaM2,2), unit:'m²', rate:rv, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(rv*areaM2,2)});
+}
+// Cutting: corrugated_3mm and micro_1_5 use area/linear menu
+if(cid==='corrugated_3mm' || cid==='micro_1_5') {
+const method = document.getElementById('cuttingMethod').value;
+if(method==='area') bd.push({label:this.t('cutPerArea'), qty:Utils.round(areaM2,2), unit:'m²', rate:3.50, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(3.50*areaM2,2)});
+else if(method==='linear'){
+const lenMm = parseFloat(document.getElementById('linearCutLength').value) || 0;
+if(lenMm > 0){ const lenM = Utils.round(lenMm/1000, 3); bd.push({label:this.t('cutPerLinear'), qty:lenM, unit:'m', rate:Config.cuttingLinearPrice, unitPriceLabel:this.t('perM'), subtotal:Utils.round(Config.cuttingLinearPrice*lenM,2)}); }
+}
+} else {
+// Other kartonas: cutting from #services checkbox
+const cutCb = document.querySelector('#services input[value="cutting"]');
+if(cutCb && cutCb.checked) {
+const cutRate = cid==='swedboard' ? 0.50 : 0.40;
+bd.push({label:this.t('svc_cutting'), qty:Utils.round(perimM,2), unit:'m', rate:cutRate, unitPriceLabel:this.t('perM'), subtotal:Utils.round(cutRate*perimM,2)});
+}
+}
+return {material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:Utils.round(bd.reduce((s,x)=>s+x.subtotal,0)*q,2)};
+}
+if(this.currentMaterial.id==='milling_standalone'){
+th=parseFloat(document.getElementById('millingThickness').value)||3;
+const r=this.getDynamicMillingRate(th);
+bd.push({label:`${this.t('millStandalone')} (${th}mm)`, qty:Utils.round(perimM,2), unit:'m', rate:r, unitPriceLabel:this.t('perM'), subtotal:Utils.round(r*perimM,2)});
+return{material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:Utils.round(bd.reduce((s,x)=>s+x.subtotal,0)*q,2)};
+}
+if(this.currentMaterial.type==='dual'){ const pt=document.getElementById('printType').value; mp=pt==='4+0'?this.currentMaterial.price40:this.currentMaterial.price44; }
+else if(this.currentMaterial.type==='pvc_dynamic'){ th=parseFloat(document.getElementById('pvcThickness').value)||3; mp=th*3; }
+else if(this.currentMaterial.id==='acrylic'){ th=parseFloat(document.getElementById('acrylicThickness').value)||3; mp=th*14; }
+else mp=this.currentMaterial.price||0;
+if(this.currentMaterial.id==='sub_flag' && document.getElementById('flagReklamine')?.checked) { mp=14; mn += ` (${this.t('lbl_reklamInCalc')})`; }
+bd.push({label:mn, qty:Utils.round(areaM2,2), unit:'m²', rate:mp, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(mp*areaM2,2)});
+if(document.getElementById('category').value==='rigid'){
+const rv=parseFloat(document.getElementById('rigidPrint').value)||0;
+if(rv>0){
+let pl=rv===10?'CMYK 4+0':rv===20?'CMYK 4+4':rv===18?'CMYK+W 5+0':rv===36?'CMYK+W 5+5':'UV';
+bd.push({label:pl, qty:Utils.round(areaM2,2), unit:'m²', rate:rv, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(rv*areaM2,2)});
+}
+if(document.getElementById('rigidNeon').checked) bd.push({label:this.t('rigidNeon'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
+if(document.getElementById('rigidWhite').checked) bd.push({label:this.t('rigidWhite'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
+if(document.getElementById('rigidBraille').checked) bd.push({label:this.t('rigidBraille'), qty:Utils.round(areaM2,2), unit:'m²', rate:100, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(100*areaM2,2)});
+if(document.getElementById('rigidVarnish').checked) bd.push({label:this.t('rigidVarnish'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
+}
+document.querySelectorAll('#services input:checked').forEach(cb => {
+if(cb.value==='lamination') return;
+if(cb.value==='welding'){const lenMm = parseFloat(document.getElementById('weldingLength').value) || 0;
+if(lenMm > 0){ const lenM = Utils.round(lenMm / 1000, 3); bd.push({label:this.t('svc_welding'), qty:lenM, unit:'m', rate:1.00, unitPriceLabel:this.t('perM'), subtotal:Utils.round(1.00*lenM,2)}); }
+return;
+}
+if(cb.value==='sewing'){
+const sewLenMm = parseFloat(document.getElementById('sewingLength').value) || 0;
+const sewM = sewLenMm > 0 ? Utils.round(sewLenMm/1000, 3) : perimM;
+const sewLabel = this.t('svc_sewing') + (sewLenMm > 0 ? '' : ` ${this.t('lbl_perim')}`);
+bd.push({label:sewLabel, qty:Utils.round(sewM,2), unit:'m', rate:1.00, unitPriceLabel:this.t('perM'), subtotal:Utils.round(1.00*sewM,2)});
+return;
+}
+if(cb.value==='calendering_addon'){ bd.push({label:this.t('svc_calendering'), qty:Utils.round(areaM2,2), unit:'m²', rate:2, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(2*areaM2,2)}); return; }
+const isPerim = cb.dataset.unit === 'perimeter';
+let rate = parseFloat(cb.dataset.price);
+if(cb.value==='milling' && (this.currentMaterial.type==='pvc_dynamic' || this.currentMaterial.id==='acrylic')) rate = this.getDynamicMillingRate(th);
+if(cb.value==='milling' && ['alu_brushed','alu_comp'].includes(this.currentMaterial.id)) rate = 1.00;
+if(cb.value==='cutting' && this.currentMaterial.id==='stadur_10') rate = 0.50;
+const qtyVal = isPerim ? perimM : areaM2;
+bd.push({ label:this.t(`svc_${cb.value}`), qty:Utils.round(qtyVal,2), unit: isPerim ? 'm' : 'm²', rate, unitPriceLabel: isPerim ? this.t('perM') : this.t('perM2'), subtotal: Utils.round(rate * qtyVal,2) });
+});
+const lc=document.querySelector('#services input[value="lamination"]');
+if(lc && lc.checked){
+let lr=3, ll=this.t('svc_lamination');
+const isVinyl = this.currentMaterial && ['film_self','film_auto','film_perforated','film_backlight'].includes(this.currentMaterial.id);
+if(isVinyl){
+const av = parseFloat(document.getElementById('laminateType').value) || 0;
+if(av > 0){ lr += av; ll += ` ${this.t({'2':'lam_econ','5':'lam_2d','8':'lam_antislip','10':'lam_3d'}[av]||'')}`; }
+// 🆕 Добавляем тип поверхности (цена НЕ меняется)
+const fin = document.getElementById('lamMatt')?.checked ? 'matte' : document.getElementById('lamGloss')?.checked ? 'gloss' : '';
+if(fin === 'matte' || fin === 'gloss') {
+ll += ` ${this.t(fin === 'matte' ? 'lam_matte' : 'lam_gloss')}`;
+}
+}
+bd.push({label:ll, qty:Utils.round(areaM2,2), unit:'m²', rate:lr, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(lr*areaM2,2)});
+}
+if(this.currentMaterial.id==='rollup' && document.getElementById('rollupMontav')?.checked) {
+bd.push({label:this.t('lbl_montavInCalc'), qty:1, unit:'vnt', rate:4.00, unitPriceLabel:'€/vnt', subtotal:4.00});
+}
+return{material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:Utils.round(bd.reduce((s,x)=>s+x.subtotal,0)*q,2)};
+},
+updateLivePreview() {
+const item = this.calculateItem();
+const box = document.getElementById('currentCalcPreview');
+if(!item || !item.breakdown.length) { box.innerHTML = `<p class="text-slate-500 text-center py-8 italic">${this.t('selectMaterial')}</p>`; return; }
+let html = `<div class="text-xs text-slate-400 mb-2 font-semibold border-b border-slate-700 pb-2">📐 ${item.dimensions} | ${this.t('quantity')}: ${item.qty} | Plotas: ${item.areaM2.toFixed(2)}m² | Perimetras: ${item.perimM.toFixed(2)}m</div>`;
+item.breakdown.forEach(l => { html += `<div class="breakdown-line"><span class="flex-1 truncate pr-1">${l.label}</span><span>${l.qty} ${l.unit} × ${l.rate}</span><span>${l.subtotal.toFixed(2)} €</span></div>`; });
+const unitPrice = item.qty > 0 ? (item.rawTotal / item.qty).toFixed(2) : "0.00";
+html += `<div class="text-center text-xs text-slate-400 mt-2">${this.t('pricePerUnit')} <span class="text-sky-400 font-medium">${unitPrice} €</span></div>`;
+html += `<div class="breakdown-total mt-1">${this.t('posTotal')} ${item.qty} ${this.t('unitQty')}: <strong class="text-lg">${item.rawTotal.toFixed(2)} €</strong></div>`;
+box.innerHTML = html;
+},
+async addToQuote() {
+const it = this.calculateItem(); if(!it) return alert(this.t('selectMaterial'));
+const itemWithId = { id: Utils.uuid(), ...it, timestamp: Date.now(), client: document.getElementById('clientName').value.trim() || 'Guest' };
+this.quoteItems.unshift(itemWithId); this.renderQuoteItems();
+},
+renderQuoteItems() {
+const c=document.getElementById('quoteItems'), tot=document.getElementById('quoteTotal'), cl=document.getElementById('clearQuoteBtn'), pf=document.getElementById('pdfBtn'), mn=document.getElementById('minNote'), vatLine = document.getElementById('vatLine');
+if(!this.quoteItems.length){ c.innerHTML=`<p class="text-slate-500 text-xs text-center py-6 italic">${this.t('quoteEmpty')}</p>`; tot.classList.add('hidden'); vatLine.classList.add('hidden'); cl?.classList.add('hidden'); pf?.classList.add('hidden'); return; }
+tot.classList.remove('hidden'); vatLine.classList.remove('hidden'); cl?.classList.remove('hidden'); pf?.classList.remove('hidden');
+let h='',gt=0;
+this.quoteItems.forEach((it)=>{ gt += it.rawTotal; let b=''; it.breakdown.forEach(l=>b+=`<div class="breakdown-line"><span class="flex-1 truncate pr-1">${l.label}</span><span>${l.qty} ${l.unit} × ${l.rate}</span><span>${l.subtotal.toFixed(2)} €</span></div>`);
+const unitPrice = it.qty > 0 ? (it.rawTotal / it.qty).toFixed(2) : '0.00';
+h+=`<div class="quote-item" data-id="${it.id}"><button class="absolute top-1.5 right-2 text-rose-400 hover:text-rose-300 text-lg leading-none" onclick="CalcApp.removeQ('${it.id}')">×</button><div class="font-semibold text-sky-400 mb-1 pr-5 text-sm">${it.material}</div><div class="quote-line text-xs">📐 ${it.dimensions} — <strong>${this.t('quantity')}: ${it.qty}</strong></div><div class="breakdown-box"><div class="text-[10px] text-slate-400 mb-1">${this.t('breakdownTitle')}</div>${b}<div class="text-center text-xs text-slate-400 mt-2">${this.t('pricePerUnit')} <span class="text-sky-400 font-medium">${unitPrice} €</span></div><div class="breakdown-total">${this.t('posTotal')} ${it.qty} ${this.t('unitQty')}: <strong>${it.rawTotal.toFixed(2)} €</strong></div></div></div>`;
+});
+const ft = Utils.round(Math.max(gt, 15), 2);
+c.innerHTML=h; document.getElementById('totalAmount').textContent = ft.toFixed(2) + ' €';
+document.getElementById('priceExVat').textContent = ft.toFixed(2) + ' €';
+document.getElementById('vatAmount').textContent = Utils.round(ft * 0.21, 2).toFixed(2) + ' €';
+document.getElementById('priceIncVat').textContent = Utils.round(ft * 1.21, 2).toFixed(2) + ' €';
+mn.textContent = gt < 15 ? `(${this.t('minApplied')})` : ''; mn.classList.toggle('hidden', gt >= 15);
+},
+removeQ(id){ if(confirm(this.t('removeItem'))){ this.quoteItems = this.quoteItems.filter(i => i.id !== id); this.renderQuoteItems(); } },
+clearQuote(){ if(confirm(this.t('clearConfirm'))){ this.quoteItems=[]; document.getElementById('clientName').value=''; this.renderQuoteItems(); } },
+
+exportPDF(){
+if(!this.quoteItems.length) return;
+let rows = ''; let rowNum = 1;
+this.quoteItems.forEach((item) => { item.breakdown.forEach((line, bIdx) => { const isMain = bIdx === 0;
+const totalQty = Utils.round(line.qty * item.qty, 3);
+const totalSubtotal = Utils.round(line.subtotal * item.qty, 2);
+rows += `<tr style="${isMain ? 'background:#fafafa;' : ''}"><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top; width:30px;">${isMain ? rowNum + '.' : ''}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top;">${isMain ? `<strong>${item.material}</strong><br><span style="color:#64748b; font-weight:400;">${item.dimensions} • ${this.t('quantity')}: ${item.qty} vnt.</span>` : `<span style="padding-left:12px; color:#475569;">${line.label}</span>`}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:center; width:60px;">${totalQty} ${line.unit}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; width:90px;">${line.rate} ${line.unitPriceLabel}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; font-weight:600; width:70px;">${totalSubtotal.toFixed(2)} €</td></tr>`; }); rowNum++; });
+const grandTotal = Utils.round(this.quoteItems.reduce((s,i)=>s+i.rawTotal,0),2);
+const finalTotal = Utils.round(Math.max(grandTotal, 15),2);
+const finalTotalVAT = Utils.round(finalTotal * 1.21,2);
+const clientName = document.getElementById('clientName').value.trim() || 'Kliento pavadinimas';
+document.getElementById('print-area').innerHTML = `<div style="font-family: 'Segoe UI', Roboto, Arial, sans-serif; padding: 25px 30px; background: #fff; color: #111;"><div style="text-align:center; margin-bottom: 20px; border-bottom: 2px solid #0ea5e9; padding-bottom: 15px;"><h1 style="margin:0; font-size: 15px; color: #0ea5e9; font-weight:700; text-transform:uppercase; letter-spacing:1px;">${this.t('commercialProposal')}</h1><p style="margin: 6px 0 0; font-size: 16px; color: #0f172a; font-weight: 600;">${clientName}</p><p style="margin: 4px 0 0; font-size: 11px; color: #64748b;">${new Date().toLocaleString('lt-LT')}</p></div><table style="width:100%; border-collapse: collapse; font-size: 10px; margin-bottom: 15px;"><thead><tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;"><th style="padding: 6px; text-align: left;">#</th><th style="padding: 6px; text-align: left;">${this.t('pdf_name')}</th><th style="padding: 6px; text-align: center;">${this.t('pdf_qty')}</th><th style="padding: 6px; text-align: right;">${this.t('pdf_price')}</th><th style="padding: 6px; text-align: right;">${this.t('pdf_total')}</th></tr></thead><tbody>${rows}</tbody></table><div style="display: flex; justify-content: flex-end; margin-top: 10px;"><div style="background: #f8fafc; padding: 10px 16px; border-radius: 6px; text-align: right; min-width: 180px; border: 1px solid #e2e8f0;"><div style="font-size: 10px; color: #64748b;">${this.t('pdf_exVat')}</div><div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">${finalTotal.toFixed(2)} €</div><div style="font-size: 10px; color: #64748b;">${this.t('pdf_vat')}</div><div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">${Utils.round(finalTotal * 0.21,2).toFixed(2)} €</div><div style="font-size: 11px; color: #64748b; margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 4px;">${this.t('pdf_incVat')}</div><div style="font-size: 18px; font-weight: 700; color: #0284c7;">${finalTotalVAT.toFixed(2)} €</div>${grandTotal < 15 ? `<div style="font-size: 9px; color: #ef4444; margin-top: 3px;">${this.t('pdf_minOrder')}</div>` : ''}</div></div><div style="margin-top: 20px; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 9px; color: #94a3b8; text-align: center;">${this.t('pdf_footer')}</div></div>`;
+setTimeout(() => { window.print(); setTimeout(() => { document.getElementById('print-area').innerHTML = ''; }, 400); }, 100);
+},
+toggleModal(s){ document.getElementById('priceModal').classList.toggle('active',s); },
+generateRefTable(){
+let h='';
+const cats=[{k:'spauda',n:'🖨️ Spauda'},{k:'pleveles',n:'🖨️ Plačiaformatė spauda'},{k:'sublimacija',n:'🧵 Tekstilė'},{k:'rigid',n:'🧱 Kietos'},{k:'kartonas',n:'📦 Kartonas'},{k:'services',n:'🔧 Paslaugos'},{k:'svc_list',n:'✂️ Papildomos'}];
+cats.forEach(c=>{
+h+=`<div class="ref-section"><h3>${c.n}</h3><table class="ref-table"><tr><th>Elementas</th><th>Kaina</th><th>Vnt.</th></tr>`;
+if(c.k==='svc_list'){
+Config.servicesList.forEach(s=>h+=`<tr><td>${s.name}</td><td>${(s.pricePerM||s.pricePerM2||s.price||0).toFixed(2)} €</td><td>${s.unit==='perimeter'?'m':s.unit==='custom'?'m':'m²'}</td></tr>`);
+h+=`<tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>Laminatai:</b> Ekon(+2)|2D(+5)|Neslidus(+8)|3D(+10)</td></tr>`;
+} else if(c.k==='services'){
+h+=`<tr><td>CMYK 4+0 ${this.t('ref_1side')}</td><td>10 €</td><td>m²</td></tr><tr><td>CMYK 4+4 ${this.t('ref_2side')}</td><td>20 €</td><td>m²</td></tr><tr><td>CMYK+W 5+0 ${this.t('ref_1side')}</td><td>18 €</td><td>m²</td></tr><tr><td>CMYK+W 5+5 ${this.t('ref_2side')}</td><td>36 €</td><td>m²</td></tr><tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>${this.t('ref_addons')}</b> Neono (+10) | Balta (+10) | Brailio/Iškili (+100) | ${this.t('uvVarnish')} (+10)</td></tr><tr><td>CNC</td><td>1–2 €</td><td>m</td></tr>`;
+} else {
+Config.materials[c.k]?.forEach(m=>{ let p=m.price?m.price.toFixed(2):m.price40?`${m.price40}/${m.price44}`:m.type==='pvc_dynamic'?'storis×3':m.id==='acrylic'?'storis×14':'-'; const mn=(typeof m.name==='object')?(m.name[this.currentLang]||m.name.lt):m.name; h+=`<tr><td>${mn}</td><td>${p} €</td><td>m²</td></tr>`; });
+if(c.k==='kartonas'){ h+=`<tr><td>3mm Gofruotas</td><td>1.00 €</td><td>m²</td></tr><tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>Pjovimas:</b> Plotas 3.50€/m² | Ilgis ${Config.cuttingLinearPrice}€/m</td></tr>`; }
+if(c.k==='pleveles'){ h+=`<tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>Papildomos paslaugos:</b> Pjovimas (0.40€/m) | Ploteris (5€/m²) | Laminavimas (nuo 2€/m²)</td></tr>`; }
+if(c.k==='rigid'){ h+=`<tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>${this.t('ref_rigidUv')}</b></td></tr><tr><td>CMYK 4+0 ${this.t('ref_1side')}</td><td>10 €</td><td>m²</td></tr><tr><td>CMYK 4+4 ${this.t('ref_2side')}</td><td>20 €</td><td>m²</td></tr><tr><td>CMYK+W 5+0 ${this.t('ref_1side')}</td><td>18 €</td><td>m²</td></tr><tr><td>CMYK+W 5+5 ${this.t('ref_2side')}</td><td>36 €</td><td>m²</td></tr><tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>${this.t('ref_rigidAddons')}</b> Neono (+10) | Balta (+10) | Brailio/Iškili (+100) | Lakas (+10)</td></tr>`; }
+}
+h+=`</table></div>`;
+});
+document.getElementById('refContent').innerHTML=h;
+},
+init() {
+try {
+this.setLang('lt');
+document.getElementById('pvcThickness').addEventListener('input', ()=>{ this.updateMaterialPrice(); this.updateServices(); this.updateLivePreview(); });
+document.getElementById('millingThickness').addEventListener('input', ()=>{ this.updateLivePreview(); });
+document.getElementById('weldingLength').addEventListener('input', () => this.updateLivePreview());
+document.getElementById('cuttingMethod').addEventListener('change', () => this.checkLinearCutWrap());
+document.addEventListener('change', e => { if(e.target.matches('.trigger-calc')) this.updateLivePreview(); });
+document.addEventListener('input', e => { if(e.target.matches('.trigger-calc')) this.updateLivePreview(); });
+this.generateRefTable();
+} catch(err) { console.error('CalcApp Init Error:', err); }
+}
+};
+window.addEventListener('load', () => CalcApp.init());
+</script>
+</body>
+</html>
