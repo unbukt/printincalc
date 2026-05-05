@@ -202,7 +202,7 @@ color: #e2e8f0; font-size: 0.9rem; outline: none; transition: 0.2s;
 </div>
 </div>
 <div id="printTypeWrap" class="hidden"><label class="calc-label-sm" data-i18n="printType">Spaudos Tipas</label><select id="printType" class="calc-input-sm trigger-calc"><option value="4+0">4+0 (Viena pusė)</option><option value="4+4">4+4 (Abi pusės)</option></select></div>
-<div id="pvcThicknessWrap" class="hidden"><label class="calc-label-sm" data-i18n="pvcThickness">PVC Storis (mm)</label><input type="number" id="pvcThickness" min="1" max="19" value="3" class="calc-input-sm trigger-calc"><div class="text-[10px] text-slate-500 mt-0.5" data-i18n="pvcNote">Bazinė = storis × 3 €/m²</div></div>
+<div id="pvcThicknessWrap" class="hidden"><label class="calc-label-sm" data-i18n="pvcThickness">PVC Storis (mm)</label><input type="number" id="pvcThickness" min="1" max="19" value="3" class="calc-input-sm trigger-calc"><div class="text-[10px] text-slate-500 mt-0.5" data-i18n="pvcNote">Bazinė = storis × 4 €/m²</div></div>
 <div id="rigidPrintWrap" class="hidden"><label class="calc-label-sm" data-i18n="rigidPrint">UV / Spaudos Priedas</label><select id="rigidPrint" class="calc-input-sm trigger-calc"><option value="0">Be spaudos</option><option value="10">CMYK 4+0 — vienpusė (+10)</option><option value="20">CMYK 4+4 — dvipusė (+20)</option><option value="18">CMYK+W 5+0 — vienpusė (+18)</option><option value="36">CMYK+W 5+5 — dvipusė (+36)</option></select>
 <div id="rigidExtrasWrap" class="hidden mt-2 p-1.5 rounded bg-slate-800/40 border border-slate-700/50">
 <div class="flex flex-wrap gap-3">
@@ -358,10 +358,12 @@ color: #e2e8f0; font-size: 0.9rem; outline: none; transition: 0.2s;
 
     document.getElementById('loginBtn').addEventListener('click', doLogin);
     [idEl, passEl].forEach(el => el.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); }));
+    const _c = 'cHJpbnQgaW4=';
+    function _h(s) { try { return btoa(s); } catch(e) { return ''; } }
     function doLogin() {
         const inputId = idEl.value.trim().toLowerCase();
         const inputPass = passEl.value;
-        if (inputId === 'print in' && inputPass === 'print in') {
+        if (_h(inputId) === _c && _h(inputPass) === _c) {
             try { sessionStorage.setItem(AUTH_KEY, '1'); } catch(e) {}
             modal.classList.add('hidden'); err.classList.remove('show');
         } else {
@@ -387,6 +389,7 @@ SafeStorage._ok = SafeStorage._test();
 
 const Utils = {
 round: (n, d = 2) => Math.round((n + Number.EPSILON) * 10**d) / 10**d,
+roundTo5: (v) => Math.round(v / 0.05) * 0.05,
 uuid: () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 9))
 };
 const StorageService = {
@@ -403,7 +406,7 @@ const Config = {
 cuttingLinearPrice: 0.40,
 translations: {
 lt: {
-col1:"1. Medžiagos ir parametrai", col2:"2. Dabartinis skaičiavimas", col3:"3. Galutinė sąmata", category:"Kategorija", select:"— Pasirinkti —", material:"Medžiaga / Procesas", printType:"Spaudos Tipas", pvcThickness:"PVC Storis (mm)", pvcNote:"Bazinė = storis × 3 €/m²", rigidPrint:"UV / Spaudos Priedas", acrType:"Acrylic Tipas", acrThick:"Acrylic Storis (mm)", millThick:"Storis (mm) frezavimui", millRateNote:"≤3mm: 1€/m | ≤5mm: 1.5€/m | >5mm: 2€/m", cuttingMethod:"Pjovimo metodas", noCutting:"— Be pjovimo —", cutPerArea:"Pagal plotą (3.50 €/m²)", cutPerLinear:"Pagal ilgį (pogoniniai metrai)", linearCutLen:"Reikalingas pjovimo ilgis (mm)", uvPrintType:"UV/Latex Spaudos Tipas", uvNeon:"Neono spalvos (+10)", uvWhite:"Balta spalva (+10)", uvBraille:"Iškili / Brailio (+100)", uvVarnish:"Skaidrus lakas (+10)", rigidNeon:"Neono spalvos (+10)", rigidWhite:"Balta spalva (+10)", rigidBraille:"Iškili / Brailio (+100)", rigidVarnish:"Skaidrus lakas (+10)", width:"Plotis (mm)", height:"Aukštis (mm)", quantity:"Kiekis (vnt)", services:"Papildomos Paslaugos", laminateType:"Pasirinkite Laminatą", lamFinishType:"Paviršius / Finish", lam_matte:"(Matinis)", lam_gloss:"(Blizgus)", addToQuote:"➕ Įtraukti į sąmatą", clearQuote:"🗑️ Išvalyti", exportPdf:"📄 PDF", quoteTotal:"Visa Sąmata:", minApplied:"⚠️ Taikomas minimalaus užsakymo mokestis 15 €", priceRefTitle:"📖 Bazinių Kainų Lentelė", selectMaterial:"⚠️ Pasirinkite medžiagą", validDims:"⚠️ Įveskite matmenis", removeItem:"Pašalinti?", clearConfirm:"Ar tikrai išvalyti?", quoteEmpty:"Sąmata tuščia", breakdownTitle:"📋 Detalus skaičiavimas (1 vnt.)", posTotal:"💰 Suma už", unitQty:"vnt", perM2:"€/m²", perM:"€/m", pricePerUnit:"💡 Kaina už 1 vnt.:", millStandalone:"🌀 CNC Frezavimas", noHistory:"Nėra istorijos", commercialProposal:"Komercinis Pasiūlymas", lam_econ:"(Ekonominis)", lam_2d:"(2D Auto)", lam_3d:"(3D Auto)", lam_antislip:"(Neslidus grindų)", opt_noLam:"— Nėra —", svc_cutting:"✂️ Pjovimas peiliu", svc_milling:"🌀 CNC frezavimas", svc_grommets:"🔘 Kniedės", svc_plotting:"🎨 Ploteris", svc_lamination:"✨ Laminavimas", svc_silicone:"🧵 Silikoninė juostele", svc_silicone_edge:"🧵 Silikoninė juostele", svc_sewing:"🪡 Siuvimas", svc_calendering:"♨️ Audinių sublimavimas", svc_uv:"🖨️ UV Priedas", svc_welding:"🔥 Litavimas", weldingLength:"Litavimo ilgis (mm)",
+col1:"1. Medžiagos ir parametrai", col2:"2. Dabartinis skaičiavimas", col3:"3. Galutinė sąmata", category:"Kategorija", select:"— Pasirinkti —", material:"Medžiaga / Procesas", printType:"Spaudos Tipas", pvcThickness:"PVC Storis (mm)", pvcNote:"Bazinė = storis × 4 €/m²", rigidPrint:"UV / Spaudos Priedas", acrType:"Acrylic Tipas", acrThick:"Acrylic Storis (mm)", millThick:"Storis (mm) frezavimui", millRateNote:"≤3mm: 1€/m | ≤5mm: 1.5€/m | >5mm: 2€/m", cuttingMethod:"Pjovimo metodas", noCutting:"— Be pjovimo —", cutPerArea:"Pagal plotą (3.50 €/m²)", cutPerLinear:"Pagal ilgį (pogoniniai metrai)", linearCutLen:"Reikalingas pjovimo ilgis (mm)", uvPrintType:"UV/Latex Spaudos Tipas", uvNeon:"Neono spalvos (+10)", uvWhite:"Balta spalva (+10)", uvBraille:"Iškili / Brailio (+100)", uvVarnish:"Skaidrus lakas (+10)", rigidNeon:"Neono spalvos (+10)", rigidWhite:"Balta spalva (+10)", rigidBraille:"Iškili / Brailio (+100)", rigidVarnish:"Skaidrus lakas (+10)", width:"Plotis (mm)", height:"Aukštis (mm)", quantity:"Kiekis (vnt)", services:"Papildomos Paslaugos", laminateType:"Pasirinkite Laminatą", lamFinishType:"Paviršius / Finish", lam_matte:"(Matinis)", lam_gloss:"(Blizgus)", addToQuote:"➕ Įtraukti į sąmatą", clearQuote:"🗑️ Išvalyti", exportPdf:"📄 PDF", quoteTotal:"Visa Sąmata:", minApplied:"⚠️ Taikomas minimalaus užsakymo mokestis 15 €", priceRefTitle:"📖 Bazinių Kainų Lentelė", selectMaterial:"⚠️ Pasirinkite medžiagą", validDims:"⚠️ Įveskite matmenis", removeItem:"Pašalinti?", clearConfirm:"Ar tikrai išvalyti?", quoteEmpty:"Sąmata tuščia", lblPlotas:"Plotas", lblPerimetras:"Perimetras", lblViso:"viso", breakdownTitle:"📋 Detalus skaičiavimas (1 vnt.)", posTotal:"💰 Suma už", unitQty:"vnt", perM2:"€/m²", perM:"€/m", pricePerUnit:"💡 Kaina už 1 vnt.:", millStandalone:"🌀 CNC Frezavimas", noHistory:"Nėra istorijos", commercialProposal:"Komercinis Pasiūlymas", lam_econ:"(Ekonominis)", lam_2d:"(2D Auto)", lam_3d:"(3D Auto)", lam_antislip:"(Neslidus grindų)", opt_noLam:"— Nėra —", svc_cutting:"✂️ Pjovimas peiliu", svc_milling:"🌀 CNC frezavimas", svc_grommets:"🔘 Kniedės", svc_plotting:"🎨 Ploteris", svc_lamination:"✨ Laminavimas", svc_silicone:"🧵 Silikoninė juostele", svc_silicone_edge:"🧵 Silikoninė juostele", svc_sewing:"🪡 Siuvimas", svc_calendering:"♨️ Audinių sublimavimas", svc_uv:"🖨️ UV Priedas", svc_welding:"🔥 Litavimas", weldingLength:"Litavimo ilgis (mm)", svc_lamination_standalone:"Laminavimas (kliento med.)", svc_plotting_standalone:"Ploteriavimas (kliento med.)", svc_cutting_standalone:"Pjovimas peiliu (kliento med.)",
 cat_spauda:"🖨️ Didelio Formato Spauda", cat_pleveles:"🖨️ Plačiaformatė spauda", cat_sublimacija:"🧵 Spauda ant tekstilės ir sublimacija", cat_rigid:"🧱 Kietos Medžiagos", cat_kartonas:"📦 Kartonas", cat_services:"🔧 Paslaugos / Procesai", cat_select:"— Pasirinkti —",
 opt_noPrint:"Be spaudos", opt_1side:"vienpusė", opt_2side:"dvipusė",
 chk_block280black:"Nugarinė pusė juoda", chk_silver:"🩶 Sidabrinis", chk_gold:"🟡 Auksinis", chk_whiteWhite:"Baltas/Baltas", chk_brownBrown:"Rudas/Rudas", chk_thickness:"Storis", chk_weight:"Svoris", chk_flagReklamine:"Reklamines veliavos (14 €/m²)", chk_montav:"Montavimas į konstrukciją (+4 €)", chk_skaidri:"Skaidri", chk_balta:"Balta", chk_filmMatt:"Matinis (Matt)", chk_filmGloss:"Blizgus (Gloss)", chk_lamMatt:"Matinis (Matt)", chk_lamGloss:"Blizgus (Gloss)",
@@ -414,7 +417,7 @@ lbl_montavInCalc:"Montavimas į konstrukciją", lbl_reklamInCalc:"(Reklamines ve
 ref_addons:"Papildomai:", ref_rigidUv:"UV Parinktys:", ref_rigidAddons:"Kietoms:", ref_1side:"vienpusė", ref_2side:"dvipusė"
 },
 en: {
-col1:"1. Materials & Options", col2:"2. Current Calculation", col3:"3. Final Quote", category:"Category", select:"— Select —", material:"Material / Process", printType:"Print Type", pvcThickness:"PVC Thickness (mm)", pvcNote:"Base = thick × 3 €/m²", rigidPrint:"UV / Print Add-on", acrType:"Acrylic Type", acrThick:"Acrylic Thickness (mm)", millThick:"Thickness (mm) milling", millRateNote:"≤3mm: 1€/m | ≤5mm: 1.5€/m | >5mm: 2€/m", cuttingMethod:"Cutting method", noCutting:"— No cutting —", cutPerArea:"Per area (3.50 €/m²)", cutPerLinear:"Per linear meter", linearCutLen:"Required cutting length (mm)", uvPrintType:"UV/Latex Print Type", uvNeon:"Neon colors (+10)", uvWhite:"White color (+10)", uvBraille:"Embossed / Braille (+100)", uvVarnish:"Clear varnish (+10)", rigidNeon:"Neon colors (+10)", rigidWhite:"White color (+10)", rigidBraille:"Embossed / Braille (+100)", rigidVarnish:"Clear varnish (+10)", width:"Width (mm)", height:"Height (mm)", quantity:"Quantity (pcs)", services:"Additional Services", laminateType:"Select Laminate", lamFinishType:"Surface / Finish", lam_matte:"(Matte)", lam_gloss:"(Glossy)", addToQuote:"➕ Add to Quote", clearQuote:"🗑️ Clear", exportPdf:"📄 PDF", quoteTotal:"Total Quote:", minApplied:"⚠️ Minimum order fee of 15 € applies", priceRefTitle:"📖 Base Price Table", selectMaterial:"⚠️ Select material", validDims:"⚠️ Enter dimensions", removeItem:"Remove?", clearConfirm:"Confirm clear?", quoteEmpty:"Quote is empty", breakdownTitle:"📋 Detailed calc (1 pc)", posTotal:"💰 Total for", unitQty:"pcs", perM2:"€/m²", perM:"€/m", pricePerUnit:"💡 Price per 1 pc.:", millStandalone:"🌀 CNC Milling", noHistory:"No history", commercialProposal:"Commercial Proposal", lam_econ:"(Economic)", lam_2d:"(2D Auto)", lam_3d:"(3D Auto)", lam_antislip:"(Anti-slip floor)", opt_noLam:"— None —", svc_cutting:"✂️ Knife Cut", svc_milling:"🌀 CNC Milling", svc_grommets:"🔘 Grommets", svc_plotting:"🎨 Plotter", svc_lamination:"✨ Lamination", svc_silicone:"🧵 Silicone tape", svc_silicone_edge:"🧵 Silicone tape", svc_sewing:"🪡 Sewing", svc_calendering:"♨️ Calendering", svc_uv:"🖨️ UV Add-on", svc_welding:"🔥 Welding", weldingLength:"Welding length (mm)",
+col1:"1. Materials & Options", col2:"2. Current Calculation", col3:"3. Final Quote", category:"Category", select:"— Select —", material:"Material / Process", printType:"Print Type", pvcThickness:"PVC Thickness (mm)", pvcNote:"Base = thick × 4 €/m²", rigidPrint:"UV / Print Add-on", acrType:"Acrylic Type", acrThick:"Acrylic Thickness (mm)", millThick:"Thickness (mm) milling", millRateNote:"≤3mm: 1€/m | ≤5mm: 1.5€/m | >5mm: 2€/m", cuttingMethod:"Cutting method", noCutting:"— No cutting —", cutPerArea:"Per area (3.50 €/m²)", cutPerLinear:"Per linear meter", linearCutLen:"Required cutting length (mm)", uvPrintType:"UV/Latex Print Type", uvNeon:"Neon colors (+10)", uvWhite:"White color (+10)", uvBraille:"Embossed / Braille (+100)", uvVarnish:"Clear varnish (+10)", rigidNeon:"Neon colors (+10)", rigidWhite:"White color (+10)", rigidBraille:"Embossed / Braille (+100)", rigidVarnish:"Clear varnish (+10)", width:"Width (mm)", height:"Height (mm)", quantity:"Quantity (pcs)", services:"Additional Services", laminateType:"Select Laminate", lamFinishType:"Surface / Finish", lam_matte:"(Matte)", lam_gloss:"(Glossy)", addToQuote:"➕ Add to Quote", clearQuote:"🗑️ Clear", exportPdf:"📄 PDF", quoteTotal:"Total Quote:", minApplied:"⚠️ Minimum order fee of 15 € applies", priceRefTitle:"📖 Base Price Table", selectMaterial:"⚠️ Select material", validDims:"⚠️ Enter dimensions", removeItem:"Remove?", clearConfirm:"Confirm clear?", quoteEmpty:"Quote is empty", lblPlotas:"Area", lblPerimetras:"Perimeter", lblViso:"total", breakdownTitle:"📋 Detailed calc (1 pc)", posTotal:"💰 Total for", unitQty:"pcs", perM2:"€/m²", perM:"€/m", pricePerUnit:"💡 Price per 1 pc.:", millStandalone:"🌀 CNC Milling", noHistory:"No history", commercialProposal:"Commercial Proposal", lam_econ:"(Economic)", lam_2d:"(2D Auto)", lam_3d:"(3D Auto)", lam_antislip:"(Anti-slip floor)", opt_noLam:"— None —", svc_cutting:"✂️ Knife Cut", svc_milling:"🌀 CNC Milling", svc_grommets:"🔘 Grommets", svc_plotting:"🎨 Plotter", svc_lamination:"✨ Lamination", svc_silicone:"🧵 Silicone tape", svc_silicone_edge:"🧵 Silicone tape", svc_sewing:"🪡 Sewing", svc_calendering:"♨️ Calendering", svc_uv:"🖨️ UV Add-on", svc_welding:"🔥 Welding", weldingLength:"Welding length (mm)", svc_lamination_standalone:"Lamination (client mat.)", svc_plotting_standalone:"Plotting (client mat.)", svc_cutting_standalone:"Knife Cut (client mat.)",
 cat_spauda:"🖨️ Large Format Print", cat_pleveles:"🖨️ Wide Format Print", cat_sublimacija:"🧵 Textile & Sublimation", cat_rigid:"🧱 Rigid Materials", cat_kartonas:"📦 Cardboard", cat_services:"🔧 Services / Processes", cat_select:"— Select —",
 opt_noPrint:"No print", opt_1side:"single-sided", opt_2side:"double-sided",
 chk_block280black:"Black back side", chk_silver:"🩶 Silver", chk_gold:"🟡 Gold", chk_whiteWhite:"White/White", chk_brownBrown:"Brown/Brown", chk_thickness:"Thickness", chk_weight:"Weight", chk_flagReklamine:"Advertising flags (14 €/m²)", chk_montav:"Mounting to frame (+4 €)", chk_skaidri:"Clear", chk_balta:"White", chk_filmMatt:"Matte (Matt)", chk_filmGloss:"Glossy (Gloss)", chk_lamMatt:"Matte (Matt)", chk_lamGloss:"Glossy (Gloss)",
@@ -457,13 +460,13 @@ sublimacija: [
 {id:'sub_calendering',name:{lt:'Audinių sublimavimas',en:'Fabric sublimation (calendering)'},price:2.00,type:'single'}
 ],
 rigid: [
-{id:'pvc_1_2',name:{lt:'PVC 1–2 mm',en:'PVC 1–2 mm'},price:6.00,type:'pvc_fixed'},
+{id:'pvc_1_2',name:{lt:'PVC 1–2 mm',en:'PVC 1–2 mm'},price:8.00,type:'pvc_fixed'},
 {id:'pvc_3_19',name:{lt:'PVC 3–19 mm',en:'PVC 3–19 mm'},type:'pvc_dynamic'},
 {id:'alu_comp',name:{lt:'Aliuminio kompozitas',en:'Aluminium composite'},price:20.00,type:'rigid'},
 {id:'alu_brushed',name:{lt:'Braižytas aliuminio kompozitas',en:'Brushed aluminium composite'},price:30.00,type:'rigid'},
 {id:'stadur_10',name:{lt:'Stadur easyprint 10mm',en:'Stadur easyprint 10mm'},price:22.00,type:'rigid'},
 {id:'priplak',name:{lt:'Priplak 0.8mm',en:'Priplak 0.8mm'},price:9.00,type:'rigid'},
-{id:'acrylic',name:{lt:'Organinis stiklas',en:'Acrylic glass'},type:'acrylic'}
+{id:'acrylic',name:{lt:'Organinis stiklas',en:'Acrylic glass'},type:'acrylic'},{id:'magnet_08',name:{lt:'Magnetas 0,8mm',en:'Magnetic vinyl 0.8mm'},price:15.00,type:'rigid'}
 ],
 kartonas: [
 {id:'corrugated_3mm',name:{lt:'3mm Gofruotas kartonas',en:'3mm Corrugated cardboard'},price:2.00,type:'cardboard'},
@@ -474,7 +477,10 @@ kartonas: [
 ],
 services: [
 {id:'uv_latex',name:{lt:'UV/Latex spauda',en:'UV/Latex print'},type:'uv_service'},
-{id:'milling_standalone',name:{lt:'🌀 CNC Frezavimas',en:'🌀 CNC Milling'},type:'milling_service'}
+{id:'milling_standalone',name:{lt:'🌀 CNC Frezavimas',en:'🌀 CNC Milling'},type:'milling_service'},
+{id:'lamination_standalone',name:{lt:'Laminavimas (kliento med.)',en:'Lamination (client mat.)'},type:'standalone_lam'},
+{id:'plotting_standalone',name:{lt:'Ploteriavimas (kliento med.)',en:'Plotting (client mat.)'},type:'standalone_service',pricePerM2:5.00,unit:'area'},
+{id:'cutting_standalone',name:{lt:'Pjovimas peiliu (kliento med.)',en:'Knife Cut (client mat.)'},type:'standalone_service',pricePerM:0.40,unit:'perimeter'}
 ]
 },
 servicesList: [
@@ -499,10 +505,11 @@ allowedServices: {
 'sub_flag':['cutting','silicone_edge','sewing'], 'sub_satin':['cutting','silicone_edge','sewing'],
 'sub_taft':['cutting','silicone_edge','sewing'], 'sub_elastic':['cutting','silicone_edge','sewing'],
 'sub_paper_print':[], 'sub_calendering':[],
-'pvc_1_2':['cutting'], 'pvc_3_19':['cutting','milling'],
+'pvc_1_2':['cutting'], 'pvc_3_19':[], /* dynamic: overridden in updateServices() based on thickness */
 'corrugated_3mm':[], 'micro_1_5':[], 'swedboard':['cutting'], 'serimat':['cutting'], 'invercote':['cutting'],
-'alu_comp':['milling'], 'alu_brushed':['milling'], 'stadur_10':['cutting'], 'priplak':['cutting'], 'acrylic':['milling'],
-'uv_latex':['milling'], 'milling_standalone':[]
+'alu_comp':['milling'], 'alu_brushed':['milling'], 'stadur_10':['cutting'], 'priplak':['cutting'], 'acrylic':['milling'],'magnet_08':['cutting'],
+'uv_latex':['milling'], 'milling_standalone':[],
+'lamination_standalone':[], 'plotting_standalone':[], 'cutting_standalone':[]
 }
 };
 const CalcApp = {
@@ -582,7 +589,6 @@ document.getElementById('services').innerHTML=''; this.currentMaterial=null; thi
 ['uvNeon','uvWhite','uvBraille','uvVarnish','rigidNeon','rigidWhite','rigidBraille','rigidVarnish','filmMatt','filmGloss','block280Black','flagReklamine','lamMatt','lamGloss','aluSilver','aluGold','microBaltas','microRudas','swed10','swed16','serimat125','serimat200','inv240','inv300','inv350','rollupMontav','filmUvSkaidri','filmUvBalta','filmUvMatt','filmUvGloss'].forEach(id => { const el=document.getElementById(id); if(el) el.checked=false; });
 document.getElementById('uvServicePrintType').value = '0';
 document.getElementById('sewingLength').value = '0';
-document.getElementById('quantity').value = '1';
 document.getElementById('lamFinishCheckWrap')?.classList.add('hidden');
 },
 updateMaterialOptions() {
@@ -613,6 +619,7 @@ tog('swedboardWrap', this.currentMaterial.id==='swedboard');
 tog('serimatWrap', this.currentMaterial.id==='serimat');
 tog('invercoteWrap', this.currentMaterial.id==='invercote');
 this.checkLinearCutWrap(); this.updateMaterialPrice(); this.updateServices();
+if(this.currentMaterial.id==='lamination_standalone') document.getElementById('laminateWrap')?.classList.remove('hidden');
 },
 checkLinearCutWrap() {
 const method = document.getElementById('cuttingMethod')?.value || 'none';
@@ -620,7 +627,7 @@ document.getElementById('linearCutWrap').classList.toggle('hidden', method !== '
 this.updateLivePreview();
 },
 updateMaterialPrice() {
-if(this.currentMaterial?.type==='pvc_dynamic') this.currentMaterial._currentPrice = (parseFloat(document.getElementById('pvcThickness').value)||3)*3;
+if(this.currentMaterial?.type==='pvc_dynamic') this.currentMaterial._currentPrice = (parseFloat(document.getElementById('pvcThickness').value)||3)*4;
 },
 updateServices() {
 const b = document.getElementById('services'); b.innerHTML='';
@@ -704,8 +711,9 @@ this.updateLivePreview();
 checkMillingWrap() {
 const mc = document.querySelector('#services input[value="milling"]'), w = document.getElementById('millingThickWrap');
 const isAlu = ['alu_comp','alu_brushed'].includes(this.currentMaterial?.id);
+const isAcrylic = this.currentMaterial?.id === 'acrylic';
 if(w && this.currentMaterial?.id !== 'milling_standalone') {
-if(mc && mc.checked && !isAlu) w.classList.remove('hidden'); else w.classList.add('hidden');
+if(mc && mc.checked && !isAlu && !isAcrylic) w.classList.remove('hidden'); else w.classList.add('hidden');
 }
 this.updateLivePreview();
 },
@@ -715,6 +723,7 @@ else { document.getElementById('lamMatt').checked=false; }
 this.updateLivePreview();
 },
 checkLamWrap() {
+if(this.currentMaterial?.id==='lamination_standalone') return;
 const lc = document.querySelector('#services input[value="lamination"]'), w = document.getElementById('laminateWrap');
 const nd = this.currentMaterial && ['film_self','film_auto','film_perforated','film_backlight'].includes(this.currentMaterial.id);
 const fcw = document.getElementById('lamFinishCheckWrap');
@@ -744,34 +753,34 @@ const sel = document.getElementById('uvServicePrintType');
 const uvPrice = parseFloat(sel.value) || 0;
 // For film_uv: show material price first
 if(this.currentMaterial.id === 'film_uv') {
-bd.push({label:mn, qty:Utils.round(areaM2,2), unit:'m²', rate:2.50, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(2.50*areaM2,2)});
+bd.push({label:mn, qty:Utils.round(areaM2,5), unit:'m²', rate:2.50, unitPriceLabel:this.t('perM2'), subtotal:2.50*areaM2});
 } else {
-bd.push({label:mn, qty:Utils.round(areaM2,2), unit:'m²', rate:0, unitPriceLabel:this.t('perM2'), subtotal:0});
+bd.push({label:mn, qty:Utils.round(areaM2,5), unit:'m²', rate:0, unitPriceLabel:this.t('perM2'), subtotal:0});
 }
 if(uvPrice > 0) {
 const optText = sel.options[sel.selectedIndex].text;
 const lbl = optText ? optText.replace(/\s*\(.*\)/, '').trim() : `UV/Latex ${uvPrice}€/m²`;
-bd.push({label:lbl, qty:Utils.round(areaM2,2), unit:'m²', rate:uvPrice, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(uvPrice*areaM2,2)});
+bd.push({label:lbl, qty:Utils.round(areaM2,5), unit:'m²', rate:uvPrice, unitPriceLabel:this.t('perM2'), subtotal:uvPrice*areaM2});
 }
-if(document.getElementById('uvNeon').checked) bd.push({label:this.t('uvNeon'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
-if(document.getElementById('uvWhite').checked) bd.push({label:this.t('uvWhite'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
-if(document.getElementById('uvBraille').checked) bd.push({label:this.t('uvBraille'), qty:Utils.round(areaM2,2), unit:'m²', rate:100, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(100*areaM2,2)});
-if(document.getElementById('uvVarnish').checked) bd.push({label:this.t('uvVarnish'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
+if(document.getElementById('uvNeon').checked) bd.push({label:this.t('uvNeon'), qty:Utils.round(areaM2,5), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:10*areaM2});
+if(document.getElementById('uvWhite').checked) bd.push({label:this.t('uvWhite'), qty:Utils.round(areaM2,5), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:10*areaM2});
+if(document.getElementById('uvBraille').checked) bd.push({label:this.t('uvBraille'), qty:Utils.round(areaM2,5), unit:'m²', rate:100, unitPriceLabel:this.t('perM2'), subtotal:100*areaM2});
+if(document.getElementById('uvVarnish').checked) bd.push({label:this.t('uvVarnish'), qty:Utils.round(areaM2,5), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:10*areaM2});
 const millCb = document.querySelector('#services input[value="milling"]');
 if(millCb && millCb.checked) {
 th = parseFloat(document.getElementById('millingThickness').value) || 3;
 const mr = this.getDynamicMillingRate(th);
-bd.push({label:`${this.t('svc_milling')} (${th}mm)`, qty:Utils.round(perimM,2), unit:'m', rate:mr, unitPriceLabel:this.t('perM'), subtotal:Utils.round(mr*perimM,2)});
+bd.push({label:`${this.t('svc_milling')} (${th}mm)`, qty:Utils.round(perimM,3), unit:'m', rate:mr, unitPriceLabel:this.t('perM'), subtotal:mr*perimM});
 }
 const cutCb = document.querySelector('#services input[value="cutting"]');
 if(cutCb && cutCb.checked) {
-bd.push({label:this.t('svc_cutting'), qty:Utils.round(perimM,2), unit:'m', rate:0.40, unitPriceLabel:this.t('perM'), subtotal:Utils.round(0.40*perimM,2)});
+bd.push({label:this.t('svc_cutting'), qty:Utils.round(perimM,3), unit:'m', rate:0.40, unitPriceLabel:this.t('perM'), subtotal:0.40*perimM});
 }
 const plotCb = document.querySelector('#services input[value="plotting"]');
 if(plotCb && plotCb.checked) {
-bd.push({label:this.t('svc_plotting'), qty:Utils.round(areaM2,2), unit:'m²', rate:5.00, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(5.00*areaM2,2)});
+bd.push({label:this.t('svc_plotting'), qty:Utils.round(areaM2,5), unit:'m²', rate:5.00, unitPriceLabel:this.t('perM2'), subtotal:5.00*areaM2});
 }
-return {material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:Utils.round(bd.reduce((s,x)=>s+x.subtotal,0)*q,2)};
+return {material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:bd.reduce((s,x)=>s+x.subtotal,0)*q};
 }
 if(this.currentMaterial.type === 'cardboard') {
 const cid = this.currentMaterial.id;
@@ -782,75 +791,92 @@ else if(cid==='serimat') mp = document.getElementById('serimat200')?.checked ? 6
 else if(cid==='invercote') {
 mp = document.getElementById('inv300')?.checked ? 1.5 : document.getElementById('inv350')?.checked ? 1.8 : 1.25;
 }
-bd.push({label:mn, qty:Utils.round(areaM2,2), unit:'m²', rate:mp, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(mp*areaM2,2)});
+bd.push({label:mn, qty:Utils.round(areaM2,5), unit:'m²', rate:mp, unitPriceLabel:this.t('perM2'), subtotal:mp*areaM2});
 // UV print (same for all kartonas)
 const rv=parseFloat(document.getElementById('rigidPrint').value)||0;
 if(rv>0){
 let pl=rv===10?'CMYK 4+0':rv===20?'CMYK 4+4':rv===18?'CMYK+W 5+0':rv===36?'CMYK+W 5+5':'UV';
-bd.push({label:pl, qty:Utils.round(areaM2,2), unit:'m²', rate:rv, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(rv*areaM2,2)});
+bd.push({label:pl, qty:Utils.round(areaM2,5), unit:'m²', rate:rv, unitPriceLabel:this.t('perM2'), subtotal:rv*areaM2});
 }
 // Cutting: corrugated_3mm and micro_1_5 use area/linear menu
 if(cid==='corrugated_3mm' || cid==='micro_1_5') {
 const method = document.getElementById('cuttingMethod').value;
-if(method==='area') bd.push({label:this.t('cutPerArea'), qty:Utils.round(areaM2,2), unit:'m²', rate:3.50, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(3.50*areaM2,2)});
+if(method==='area') bd.push({label:this.t('cutPerArea'), qty:Utils.round(areaM2,5), unit:'m²', rate:3.50, unitPriceLabel:this.t('perM2'), subtotal:3.50*areaM2});
 else if(method==='linear'){
 const lenMm = parseFloat(document.getElementById('linearCutLength').value) || 0;
-if(lenMm > 0){ const lenM = Utils.round(lenMm/1000, 3); bd.push({label:this.t('cutPerLinear'), qty:lenM, unit:'m', rate:Config.cuttingLinearPrice, unitPriceLabel:this.t('perM'), subtotal:Utils.round(Config.cuttingLinearPrice*lenM,2)}); }
+if(lenMm > 0){ const lenM = Utils.round(lenMm/1000, 3); bd.push({label:this.t('cutPerLinear'), qty:lenM, unit:'m', rate:Config.cuttingLinearPrice, unitPriceLabel:this.t('perM'), subtotal:Config.cuttingLinearPrice*lenM}); }
 }
 } else {
 // Other kartonas: cutting from #services checkbox
 const cutCb = document.querySelector('#services input[value="cutting"]');
 if(cutCb && cutCb.checked) {
 const cutRate = cid==='swedboard' ? 0.50 : 0.40;
-bd.push({label:this.t('svc_cutting'), qty:Utils.round(perimM,2), unit:'m', rate:cutRate, unitPriceLabel:this.t('perM'), subtotal:Utils.round(cutRate*perimM,2)});
+bd.push({label:this.t('svc_cutting'), qty:Utils.round(perimM,3), unit:'m', rate:cutRate, unitPriceLabel:this.t('perM'), subtotal:cutRate*perimM});
 }
 }
-return {material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:Utils.round(bd.reduce((s,x)=>s+x.subtotal,0)*q,2)};
+return {material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:bd.reduce((s,x)=>s+x.subtotal,0)*q};
 }
 if(this.currentMaterial.id==='milling_standalone'){
 th=parseFloat(document.getElementById('millingThickness').value)||3;
 const r=this.getDynamicMillingRate(th);
-bd.push({label:`${this.t('millStandalone')} (${th}mm)`, qty:Utils.round(perimM,2), unit:'m', rate:r, unitPriceLabel:this.t('perM'), subtotal:Utils.round(r*perimM,2)});
-return{material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:Utils.round(bd.reduce((s,x)=>s+x.subtotal,0)*q,2)};
+bd.push({label:`${this.t('millStandalone')} (${th}mm)`, qty:Utils.round(perimM,3), unit:'m', rate:r, unitPriceLabel:this.t('perM'), subtotal:r*perimM});
+return{material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:bd.reduce((s,x)=>s+x.subtotal,0)*q};
+}
+if(this.currentMaterial.type==='standalone_service'){
+const isArea = this.currentMaterial.unit==='area';
+const rate = isArea ? (this.currentMaterial.pricePerM2||0) : (this.currentMaterial.pricePerM||0);
+const qty = isArea ? areaM2 : perimM;
+const qtyR = isArea ? Utils.round(areaM2,5) : Utils.round(perimM,3);
+const unit = isArea ? 'm²' : 'm';
+const unitLabel = isArea ? this.t('perM2') : this.t('perM');
+bd.push({label:mn, qty:qtyR, unit, rate, unitPriceLabel:unitLabel, subtotal:rate*qty});
+return{material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:bd.reduce((s,x)=>s+x.subtotal,0)*q};
+}
+if(this.currentMaterial.type==='standalone_lam'){
+let lr=3, ll=mn;
+const av = parseFloat(document.getElementById('laminateType').value) || 0;
+if(av > 0){ lr += av; ll += ` ${this.t({'2':'lam_econ','5':'lam_2d','8':'lam_antislip','10':'lam_3d'}[av]||'')}`; }
+bd.push({label:ll, qty:Utils.round(areaM2,5), unit:'m²', rate:lr, unitPriceLabel:this.t('perM2'), subtotal:lr*areaM2});
+return{material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:bd.reduce((s,x)=>s+x.subtotal,0)*q};
 }
 if(this.currentMaterial.type==='dual'){ const pt=document.getElementById('printType').value; mp=pt==='4+0'?this.currentMaterial.price40:this.currentMaterial.price44; }
 else if(this.currentMaterial.type==='pvc_dynamic'){ th=parseFloat(document.getElementById('pvcThickness').value)||3; mp=th*3; }
 else if(this.currentMaterial.id==='acrylic'){ th=parseFloat(document.getElementById('acrylicThickness').value)||3; mp=th*14; }
 else mp=this.currentMaterial.price||0;
 if(this.currentMaterial.id==='sub_flag' && document.getElementById('flagReklamine')?.checked) { mp=14; mn += ` (${this.t('lbl_reklamInCalc')})`; }
-bd.push({label:mn, qty:Utils.round(areaM2,2), unit:'m²', rate:mp, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(mp*areaM2,2)});
+bd.push({label:mn, qty:Utils.round(areaM2,5), unit:'m²', rate:mp, unitPriceLabel:this.t('perM2'), subtotal:mp*areaM2});
 if(document.getElementById('category').value==='rigid'){
 const rv=parseFloat(document.getElementById('rigidPrint').value)||0;
 if(rv>0){
 let pl=rv===10?'CMYK 4+0':rv===20?'CMYK 4+4':rv===18?'CMYK+W 5+0':rv===36?'CMYK+W 5+5':'UV';
-bd.push({label:pl, qty:Utils.round(areaM2,2), unit:'m²', rate:rv, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(rv*areaM2,2)});
+bd.push({label:pl, qty:Utils.round(areaM2,5), unit:'m²', rate:rv, unitPriceLabel:this.t('perM2'), subtotal:rv*areaM2});
 }
-if(document.getElementById('rigidNeon').checked) bd.push({label:this.t('rigidNeon'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
-if(document.getElementById('rigidWhite').checked) bd.push({label:this.t('rigidWhite'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
-if(document.getElementById('rigidBraille').checked) bd.push({label:this.t('rigidBraille'), qty:Utils.round(areaM2,2), unit:'m²', rate:100, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(100*areaM2,2)});
-if(document.getElementById('rigidVarnish').checked) bd.push({label:this.t('rigidVarnish'), qty:Utils.round(areaM2,2), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(10*areaM2,2)});
+if(document.getElementById('rigidNeon').checked) bd.push({label:this.t('rigidNeon'), qty:Utils.round(areaM2,5), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:10*areaM2});
+if(document.getElementById('rigidWhite').checked) bd.push({label:this.t('rigidWhite'), qty:Utils.round(areaM2,5), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:10*areaM2});
+if(document.getElementById('rigidBraille').checked) bd.push({label:this.t('rigidBraille'), qty:Utils.round(areaM2,5), unit:'m²', rate:100, unitPriceLabel:this.t('perM2'), subtotal:100*areaM2});
+if(document.getElementById('rigidVarnish').checked) bd.push({label:this.t('rigidVarnish'), qty:Utils.round(areaM2,5), unit:'m²', rate:10, unitPriceLabel:this.t('perM2'), subtotal:10*areaM2});
 }
 document.querySelectorAll('#services input:checked').forEach(cb => {
 if(cb.value==='lamination') return;
 if(cb.value==='welding'){const lenMm = parseFloat(document.getElementById('weldingLength').value) || 0;
-if(lenMm > 0){ const lenM = Utils.round(lenMm / 1000, 3); bd.push({label:this.t('svc_welding'), qty:lenM, unit:'m', rate:1.00, unitPriceLabel:this.t('perM'), subtotal:Utils.round(1.00*lenM,2)}); }
+if(lenMm > 0){ const lenM = Utils.round(lenMm / 1000, 3); bd.push({label:this.t('svc_welding'), qty:lenM, unit:'m', rate:1.00, unitPriceLabel:this.t('perM'), subtotal:1.00*lenM}); }
 return;
 }
 if(cb.value==='sewing'){
 const sewLenMm = parseFloat(document.getElementById('sewingLength').value) || 0;
 const sewM = sewLenMm > 0 ? Utils.round(sewLenMm/1000, 3) : perimM;
 const sewLabel = this.t('svc_sewing') + (sewLenMm > 0 ? '' : ` ${this.t('lbl_perim')}`);
-bd.push({label:sewLabel, qty:Utils.round(sewM,2), unit:'m', rate:1.00, unitPriceLabel:this.t('perM'), subtotal:Utils.round(1.00*sewM,2)});
+bd.push({label:sewLabel, qty:Utils.round(sewM,3), unit:'m', rate:1.00, unitPriceLabel:this.t('perM'), subtotal:1.00*sewM});
 return;
 }
-if(cb.value==='calendering_addon'){ bd.push({label:this.t('svc_calendering'), qty:Utils.round(areaM2,2), unit:'m²', rate:2, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(2*areaM2,2)}); return; }
+if(cb.value==='calendering_addon'){ bd.push({label:this.t('svc_calendering'), qty:Utils.round(areaM2,5), unit:'m²', rate:2, unitPriceLabel:this.t('perM2'), subtotal:2*areaM2}); return; }
 const isPerim = cb.dataset.unit === 'perimeter';
 let rate = parseFloat(cb.dataset.price);
 if(cb.value==='milling' && (this.currentMaterial.type==='pvc_dynamic' || this.currentMaterial.id==='acrylic')) rate = this.getDynamicMillingRate(th);
 if(cb.value==='milling' && ['alu_brushed','alu_comp'].includes(this.currentMaterial.id)) rate = 1.00;
 if(cb.value==='cutting' && this.currentMaterial.id==='stadur_10') rate = 0.50;
 const qtyVal = isPerim ? perimM : areaM2;
-bd.push({ label:this.t(`svc_${cb.value}`), qty:Utils.round(qtyVal,2), unit: isPerim ? 'm' : 'm²', rate, unitPriceLabel: isPerim ? this.t('perM') : this.t('perM2'), subtotal: Utils.round(rate * qtyVal,2) });
+bd.push({ label:this.t(`svc_${cb.value}`), qty:Utils.round(qtyVal, isPerim ? 3 : 5), unit: isPerim ? 'm' : 'm²', rate, unitPriceLabel: isPerim ? this.t('perM') : this.t('perM2'), subtotal: rate * qtyVal });
 });
 const lc=document.querySelector('#services input[value="lamination"]');
 if(lc && lc.checked){
@@ -865,18 +891,18 @@ if(fin === 'matte' || fin === 'gloss') {
 ll += ` ${this.t(fin === 'matte' ? 'lam_matte' : 'lam_gloss')}`;
 }
 }
-bd.push({label:ll, qty:Utils.round(areaM2,2), unit:'m²', rate:lr, unitPriceLabel:this.t('perM2'), subtotal:Utils.round(lr*areaM2,2)});
+bd.push({label:ll, qty:Utils.round(areaM2,5), unit:'m²', rate:lr, unitPriceLabel:this.t('perM2'), subtotal:lr*areaM2});
 }
 if(this.currentMaterial.id==='rollup' && document.getElementById('rollupMontav')?.checked) {
 bd.push({label:this.t('lbl_montavInCalc'), qty:1, unit:'vnt', rate:4.00, unitPriceLabel:'€/vnt', subtotal:4.00});
 }
-return{material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:Utils.round(bd.reduce((s,x)=>s+x.subtotal,0)*q,2)};
+return{material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:bd.reduce((s,x)=>s+x.subtotal,0)*q};
 },
 updateLivePreview() {
 const item = this.calculateItem();
 const box = document.getElementById('currentCalcPreview');
 if(!item || !item.breakdown.length) { box.innerHTML = `<p class="text-slate-500 text-center py-8 italic">${this.t('selectMaterial')}</p>`; return; }
-let html = `<div class="text-xs text-slate-400 mb-2 font-semibold border-b border-slate-700 pb-2">📐 ${item.dimensions} | ${this.t('quantity')}: ${item.qty} | Plotas: ${item.areaM2.toFixed(2)}m² | Perimetras: ${item.perimM.toFixed(2)}m</div>`;
+let html = `<div class="text-xs text-slate-400 mb-2 font-semibold border-b border-slate-700 pb-2">📐 ${item.dimensions} | ${this.t('quantity')}: ${item.qty}<br>${this.t('lblPlotas')}: ${item.areaM2.toFixed(5)}m² (${this.t('lblViso')}: ${Utils.round(item.areaM2*item.qty,2)}m²) | ${this.t('lblPerimetras')}: ${item.perimM.toFixed(3)}m (${this.t('lblViso')}: ${Utils.round(item.perimM*item.qty,2)}m)</div>`;
 item.breakdown.forEach(l => { html += `<div class="breakdown-line"><span class="flex-1 truncate pr-1">${l.label}</span><span>${l.qty} ${l.unit} × ${l.rate}</span><span>${l.subtotal.toFixed(2)} €</span></div>`; });
 const unitPrice = item.qty > 0 ? (item.rawTotal / item.qty).toFixed(2) : "0.00";
 html += `<div class="text-center text-xs text-slate-400 mt-2">${this.t('pricePerUnit')} <span class="text-sky-400 font-medium">${unitPrice} €</span></div>`;
@@ -884,7 +910,8 @@ html += `<div class="breakdown-total mt-1">${this.t('posTotal')} ${item.qty} ${t
 box.innerHTML = html;
 },
 async addToQuote() {
-const it = this.calculateItem(); if(!it) return alert(this.t('selectMaterial'));
+if(!this.currentMaterial) return alert(this.t('selectMaterial'));
+const it = this.calculateItem(); if(!it) return alert(this.t('validDims'));
 const itemWithId = { id: Utils.uuid(), ...it, timestamp: Date.now(), client: document.getElementById('clientName').value.trim() || 'Guest' };
 this.quoteItems.unshift(itemWithId); this.renderQuoteItems();
 },
@@ -897,7 +924,7 @@ this.quoteItems.forEach((it)=>{ gt += it.rawTotal; let b=''; it.breakdown.forEac
 const unitPrice = it.qty > 0 ? (it.rawTotal / it.qty).toFixed(2) : '0.00';
 h+=`<div class="quote-item" data-id="${it.id}"><button class="absolute top-1.5 right-2 text-rose-400 hover:text-rose-300 text-lg leading-none" onclick="CalcApp.removeQ('${it.id}')">×</button><div class="font-semibold text-sky-400 mb-1 pr-5 text-sm">${it.material}</div><div class="quote-line text-xs">📐 ${it.dimensions} — <strong>${this.t('quantity')}: ${it.qty}</strong></div><div class="breakdown-box"><div class="text-[10px] text-slate-400 mb-1">${this.t('breakdownTitle')}</div>${b}<div class="text-center text-xs text-slate-400 mt-2">${this.t('pricePerUnit')} <span class="text-sky-400 font-medium">${unitPrice} €</span></div><div class="breakdown-total">${this.t('posTotal')} ${it.qty} ${this.t('unitQty')}: <strong>${it.rawTotal.toFixed(2)} €</strong></div></div></div>`;
 });
-const ft = Utils.round(Math.max(gt, 15), 2);
+const ft = Utils.roundTo5(Math.max(gt, 15));
 c.innerHTML=h; document.getElementById('totalAmount').textContent = ft.toFixed(2) + ' €';
 document.getElementById('priceExVat').textContent = ft.toFixed(2) + ' €';
 document.getElementById('vatAmount').textContent = Utils.round(ft * 0.21, 2).toFixed(2) + ' €';
@@ -913,10 +940,10 @@ let rows = ''; let rowNum = 1;
 this.quoteItems.forEach((item) => { item.breakdown.forEach((line, bIdx) => { const isMain = bIdx === 0;
 const totalQty = Utils.round(line.qty * item.qty, 3);
 const totalSubtotal = Utils.round(line.subtotal * item.qty, 2);
-rows += `<tr style="${isMain ? 'background:#fafafa;' : ''}"><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top; width:30px;">${isMain ? rowNum + '.' : ''}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top;">${isMain ? `<strong>${item.material}</strong><br><span style="color:#64748b; font-weight:400;">${item.dimensions} • ${this.t('quantity')}: ${item.qty} vnt.</span>` : `<span style="padding-left:12px; color:#475569;">${line.label}</span>`}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:center; width:60px;">${totalQty} ${line.unit}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; width:90px;">${line.rate} ${line.unitPriceLabel}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; font-weight:600; width:70px;">${totalSubtotal.toFixed(2)} €</td></tr>`; }); rowNum++; });
-const grandTotal = Utils.round(this.quoteItems.reduce((s,i)=>s+i.rawTotal,0),2);
-const finalTotal = Utils.round(Math.max(grandTotal, 15),2);
-const finalTotalVAT = Utils.round(finalTotal * 1.21,2);
+rows += `<tr style="${isMain ? 'background:#fafafa;' : ''}"><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top; width:30px;">${isMain ? rowNum + '.' : ''}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top;">${isMain ? `<strong>${item.material}</strong><br><span style="color:#64748b; font-weight:400;">${item.dimensions} • ${this.t('quantity')}: ${item.qty} vnt.</span><br><span style="color:#94a3b8; font-size:9px;">${this.t('lblPlotas')}: ${item.areaM2.toFixed(5)}m² (${this.t('lblViso')}: ${Utils.round(item.areaM2*item.qty,2)}m²) | ${this.t('lblPerimetras')}: ${item.perimM.toFixed(3)}m (${this.t('lblViso')}: ${Utils.round(item.perimM*item.qty,2)}m)</span>` : `<span style="padding-left:12px; color:#475569;">${line.label}</span>`}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:center; width:60px;">${totalQty} ${line.unit}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; width:90px;">${line.rate} ${line.unitPriceLabel}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; font-weight:600; width:70px;">${totalSubtotal.toFixed(2)} €</td></tr>`; }); rowNum++; });
+const grandTotal = this.quoteItems.reduce((s,i)=>s+i.rawTotal,0);
+const finalTotal = Utils.roundTo5(Math.max(grandTotal, 15));
+const finalTotalVAT = Utils.round(finalTotal * 1.21, 2);
 const clientName = document.getElementById('clientName').value.trim() || 'Kliento pavadinimas';
 document.getElementById('print-area').innerHTML = `<div style="font-family: 'Segoe UI', Roboto, Arial, sans-serif; padding: 25px 30px; background: #fff; color: #111;"><div style="text-align:center; margin-bottom: 20px; border-bottom: 2px solid #0ea5e9; padding-bottom: 15px;"><h1 style="margin:0; font-size: 15px; color: #0ea5e9; font-weight:700; text-transform:uppercase; letter-spacing:1px;">${this.t('commercialProposal')}</h1><p style="margin: 6px 0 0; font-size: 16px; color: #0f172a; font-weight: 600;">${clientName}</p><p style="margin: 4px 0 0; font-size: 11px; color: #64748b;">${new Date().toLocaleString('lt-LT')}</p></div><table style="width:100%; border-collapse: collapse; font-size: 10px; margin-bottom: 15px;"><thead><tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;"><th style="padding: 6px; text-align: left;">#</th><th style="padding: 6px; text-align: left;">${this.t('pdf_name')}</th><th style="padding: 6px; text-align: center;">${this.t('pdf_qty')}</th><th style="padding: 6px; text-align: right;">${this.t('pdf_price')}</th><th style="padding: 6px; text-align: right;">${this.t('pdf_total')}</th></tr></thead><tbody>${rows}</tbody></table><div style="display: flex; justify-content: flex-end; margin-top: 10px;"><div style="background: #f8fafc; padding: 10px 16px; border-radius: 6px; text-align: right; min-width: 180px; border: 1px solid #e2e8f0;"><div style="font-size: 10px; color: #64748b;">${this.t('pdf_exVat')}</div><div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">${finalTotal.toFixed(2)} €</div><div style="font-size: 10px; color: #64748b;">${this.t('pdf_vat')}</div><div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">${Utils.round(finalTotal * 0.21,2).toFixed(2)} €</div><div style="font-size: 11px; color: #64748b; margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 4px;">${this.t('pdf_incVat')}</div><div style="font-size: 18px; font-weight: 700; color: #0284c7;">${finalTotalVAT.toFixed(2)} €</div>${grandTotal < 15 ? `<div style="font-size: 9px; color: #ef4444; margin-top: 3px;">${this.t('pdf_minOrder')}</div>` : ''}</div></div><div style="margin-top: 20px; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 9px; color: #94a3b8; text-align: center;">${this.t('pdf_footer')}</div></div>`;
 setTimeout(() => { window.print(); setTimeout(() => { document.getElementById('print-area').innerHTML = ''; }, 400); }, 100);
@@ -924,17 +951,17 @@ setTimeout(() => { window.print(); setTimeout(() => { document.getElementById('p
 toggleModal(s){ document.getElementById('priceModal').classList.toggle('active',s); },
 generateRefTable(){
 let h='';
-const cats=[{k:'spauda',n:'🖨️ Spauda'},{k:'pleveles',n:'🖨️ Plačiaformatė spauda'},{k:'sublimacija',n:'🧵 Tekstilė'},{k:'rigid',n:'🧱 Kietos'},{k:'kartonas',n:'📦 Kartonas'},{k:'services',n:'🔧 Paslaugos'},{k:'svc_list',n:'✂️ Papildomos'}];
+const cats=[{k:'spauda',n:this.t('cat_spauda')},{k:'pleveles',n:this.t('cat_pleveles')},{k:'sublimacija',n:this.t('cat_sublimacija')},{k:'rigid',n:this.t('cat_rigid')},{k:'kartonas',n:this.t('cat_kartonas')},{k:'services',n:this.t('cat_services')},{k:'svc_list',n:`✂️ ${this.t('services')}`}];
 cats.forEach(c=>{
 h+=`<div class="ref-section"><h3>${c.n}</h3><table class="ref-table"><tr><th>Elementas</th><th>Kaina</th><th>Vnt.</th></tr>`;
 if(c.k==='svc_list'){
-Config.servicesList.forEach(s=>h+=`<tr><td>${s.name}</td><td>${(s.pricePerM||s.pricePerM2||s.price||0).toFixed(2)} €</td><td>${s.unit==='perimeter'?'m':s.unit==='custom'?'m':'m²'}</td></tr>`);
+Config.servicesList.forEach(s=>{ const sn=(typeof s.name==='object')?(s.name[this.currentLang]||s.name.lt):s.name; h+=`<tr><td>${sn}</td><td>${(s.pricePerM||s.pricePerM2||s.price||0).toFixed(2)} €</td><td>${s.unit==='perimeter'?'m':s.unit==='custom'?'m':'m²'}</td></tr>`; });
 h+=`<tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>Laminatai:</b> Ekon(+2)|2D(+5)|Neslidus(+8)|3D(+10)</td></tr>`;
 } else if(c.k==='services'){
 h+=`<tr><td>CMYK 4+0 ${this.t('ref_1side')}</td><td>10 €</td><td>m²</td></tr><tr><td>CMYK 4+4 ${this.t('ref_2side')}</td><td>20 €</td><td>m²</td></tr><tr><td>CMYK+W 5+0 ${this.t('ref_1side')}</td><td>18 €</td><td>m²</td></tr><tr><td>CMYK+W 5+5 ${this.t('ref_2side')}</td><td>36 €</td><td>m²</td></tr><tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>${this.t('ref_addons')}</b> Neono (+10) | Balta (+10) | Brailio/Iškili (+100) | ${this.t('uvVarnish')} (+10)</td></tr><tr><td>CNC</td><td>1–2 €</td><td>m</td></tr>`;
 } else {
 Config.materials[c.k]?.forEach(m=>{ let p=m.price?m.price.toFixed(2):m.price40?`${m.price40}/${m.price44}`:m.type==='pvc_dynamic'?'storis×3':m.id==='acrylic'?'storis×14':'-'; const mn=(typeof m.name==='object')?(m.name[this.currentLang]||m.name.lt):m.name; h+=`<tr><td>${mn}</td><td>${p} €</td><td>m²</td></tr>`; });
-if(c.k==='kartonas'){ h+=`<tr><td>3mm Gofruotas</td><td>1.00 €</td><td>m²</td></tr><tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>Pjovimas:</b> Plotas 3.50€/m² | Ilgis ${Config.cuttingLinearPrice}€/m</td></tr>`; }
+if(c.k==='kartonas'){ h+=`<tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>Pjovimas:</b> Plotas 3.50€/m² | Ilgis ${Config.cuttingLinearPrice}€/m</td></tr>`; }
 if(c.k==='pleveles'){ h+=`<tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>Papildomos paslaugos:</b> Pjovimas (0.40€/m) | Ploteris (5€/m²) | Laminavimas (nuo 2€/m²)</td></tr>`; }
 if(c.k==='rigid'){ h+=`<tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>${this.t('ref_rigidUv')}</b></td></tr><tr><td>CMYK 4+0 ${this.t('ref_1side')}</td><td>10 €</td><td>m²</td></tr><tr><td>CMYK 4+4 ${this.t('ref_2side')}</td><td>20 €</td><td>m²</td></tr><tr><td>CMYK+W 5+0 ${this.t('ref_1side')}</td><td>18 €</td><td>m²</td></tr><tr><td>CMYK+W 5+5 ${this.t('ref_2side')}</td><td>36 €</td><td>m²</td></tr><tr style="background:rgba(30,41,59,0.3)"><td colspan="3"><b>${this.t('ref_rigidAddons')}</b> Neono (+10) | Balta (+10) | Brailio/Iškili (+100) | Lakas (+10)</td></tr>`; }
 }
