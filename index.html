@@ -107,6 +107,8 @@ color: #e2e8f0; font-size: 0.9rem; outline: none; transition: 0.2s;
 <button onclick="CalcApp.setLang('en')" class="px-2 py-0.5 text-xs rounded transition" id="btn-en">EN</button>
 </div>
 <button onclick="CalcApp.toggleModal(true)" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition">📖 Kainos</button>
+<span id="clientBadge" class="hidden text-xs font-semibold px-2 py-1 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">CLIENT +25%</span>
+<button onclick="CalcApp.doLogout()" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition text-slate-400 hover:text-slate-200">⎋ Išeiti</button>
 </div>
 </header>
 <main class="flex-1 p-4 overflow-hidden">
@@ -358,14 +360,24 @@ color: #e2e8f0; font-size: 0.9rem; outline: none; transition: 0.2s;
 
     document.getElementById('loginBtn').addEventListener('click', doLogin);
     [idEl, passEl].forEach(el => el.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); }));
-    const _c = 'cHJpbnQgaW4=';
     function _h(s) { try { return btoa(s); } catch(e) { return ''; } }
+    const CREDS = [
+        { id: _h('print in'), pass: _h('print in'), markup: 1.0, role: 'manager' },
+        { id: _h('print in'), pass: _h('miroslav'), markup: 1.25, role: 'client' }
+    ];
     function doLogin() {
         const inputId = idEl.value.trim().toLowerCase();
         const inputPass = passEl.value;
-        if (_h(inputId) === _c && _h(inputPass) === _c) {
-            try { sessionStorage.setItem(AUTH_KEY, '1'); } catch(e) {}
+        const user = CREDS.find(c => c.id === _h(inputId) && c.pass === _h(inputPass));
+        if (user) {
+            try { sessionStorage.setItem(AUTH_KEY, '1'); sessionStorage.setItem('printin_role', user.role); } catch(e) {}
             modal.classList.add('hidden'); err.classList.remove('show');
+            if (typeof CalcApp !== 'undefined') {
+                CalcApp.priceMultiplier = user.markup;
+                CalcApp.userRole = user.role;
+                const badge = document.getElementById('clientBadge');
+                if (badge) badge.classList.toggle('hidden', user.role !== 'client');
+            }
         } else {
             err.classList.add('show'); passEl.value = ''; passEl.focus();
             setTimeout(() => err.classList.remove('show'), 2500);
@@ -514,6 +526,7 @@ allowedServices: {
 };
 const CalcApp = {
 currentLang: 'lt', currentMaterial: null, quoteItems: [],
+priceMultiplier: 1.0, userRole: 'manager',
 t(k) { return Config.translations[this.currentLang]?.[k] || k; },
 setLang(l) {
 this.currentLang = l;
@@ -903,10 +916,11 @@ const item = this.calculateItem();
 const box = document.getElementById('currentCalcPreview');
 if(!item || !item.breakdown.length) { box.innerHTML = `<p class="text-slate-500 text-center py-8 italic">${this.t('selectMaterial')}</p>`; return; }
 let html = `<div class="text-xs text-slate-400 mb-2 font-semibold border-b border-slate-700 pb-2">📐 ${item.dimensions} | ${this.t('quantity')}: ${item.qty}<br>${this.t('lblPlotas')}: ${item.areaM2.toFixed(5)}m² (${this.t('lblViso')}: ${Utils.round(item.areaM2*item.qty,2)}m²) | ${this.t('lblPerimetras')}: ${item.perimM.toFixed(3)}m (${this.t('lblViso')}: ${Utils.round(item.perimM*item.qty,2)}m)</div>`;
-item.breakdown.forEach(l => { html += `<div class="breakdown-line"><span class="flex-1 truncate pr-1">${l.label}</span><span>${l.qty} ${l.unit} × ${l.rate}</span><span>${l.subtotal.toFixed(2)} €</span></div>`; });
-const unitPrice = item.qty > 0 ? (item.rawTotal / item.qty).toFixed(2) : "0.00";
+item.breakdown.forEach(l => { html += `<div class="breakdown-line"><span class="flex-1 truncate pr-1">${l.label}</span><span>${l.qty} ${l.unit} × ${Utils.round(l.rate * this.priceMultiplier, 2)}</span><span>${(l.subtotal * this.priceMultiplier).toFixed(2)} €</span></div>`; });
+const displayTotal = item.rawTotal * this.priceMultiplier;
+const unitPrice = item.qty > 0 ? (displayTotal / item.qty).toFixed(2) : "0.00";
 html += `<div class="text-center text-xs text-slate-400 mt-2">${this.t('pricePerUnit')} <span class="text-sky-400 font-medium">${unitPrice} €</span></div>`;
-html += `<div class="breakdown-total mt-1">${this.t('posTotal')} ${item.qty} ${this.t('unitQty')}: <strong class="text-lg">${item.rawTotal.toFixed(2)} €</strong></div>`;
+html += `<div class="breakdown-total mt-1">${this.t('posTotal')} ${item.qty} ${this.t('unitQty')}: <strong class="text-lg">${displayTotal.toFixed(2)} €</strong></div>`;
 box.innerHTML = html;
 },
 async addToQuote() {
@@ -920,11 +934,12 @@ const c=document.getElementById('quoteItems'), tot=document.getElementById('quot
 if(!this.quoteItems.length){ c.innerHTML=`<p class="text-slate-500 text-xs text-center py-6 italic">${this.t('quoteEmpty')}</p>`; tot.classList.add('hidden'); vatLine.classList.add('hidden'); cl?.classList.add('hidden'); pf?.classList.add('hidden'); return; }
 tot.classList.remove('hidden'); vatLine.classList.remove('hidden'); cl?.classList.remove('hidden'); pf?.classList.remove('hidden');
 let h='',gt=0;
-this.quoteItems.forEach((it)=>{ gt += it.rawTotal; let b=''; it.breakdown.forEach(l=>b+=`<div class="breakdown-line"><span class="flex-1 truncate pr-1">${l.label}</span><span>${l.qty} ${l.unit} × ${l.rate}</span><span>${l.subtotal.toFixed(2)} €</span></div>`);
-const unitPrice = it.qty > 0 ? (it.rawTotal / it.qty).toFixed(2) : '0.00';
-h+=`<div class="quote-item" data-id="${it.id}"><button class="absolute top-1.5 right-2 text-rose-400 hover:text-rose-300 text-lg leading-none" onclick="CalcApp.removeQ('${it.id}')">×</button><div class="font-semibold text-sky-400 mb-1 pr-5 text-sm">${it.material}</div><div class="quote-line text-xs">📐 ${it.dimensions} — <strong>${this.t('quantity')}: ${it.qty}</strong></div><div class="breakdown-box"><div class="text-[10px] text-slate-400 mb-1">${this.t('breakdownTitle')}</div>${b}<div class="text-center text-xs text-slate-400 mt-2">${this.t('pricePerUnit')} <span class="text-sky-400 font-medium">${unitPrice} €</span></div><div class="breakdown-total">${this.t('posTotal')} ${it.qty} ${this.t('unitQty')}: <strong>${it.rawTotal.toFixed(2)} €</strong></div></div></div>`;
+this.quoteItems.forEach((it)=>{ gt += it.rawTotal; let b=''; it.breakdown.forEach(l=>b+=`<div class="breakdown-line"><span class="flex-1 truncate pr-1">${l.label}</span><span>${l.qty} ${l.unit} × ${Utils.round(l.rate * this.priceMultiplier, 2)}</span><span>${(l.subtotal * this.priceMultiplier).toFixed(2)} €</span></div>`);
+const itemDisplay = it.rawTotal * this.priceMultiplier;
+const unitPrice = it.qty > 0 ? (itemDisplay / it.qty).toFixed(2) : '0.00';
+h+=`<div class="quote-item" data-id="${it.id}"><button class="absolute top-1.5 right-2 text-rose-400 hover:text-rose-300 text-lg leading-none" onclick="CalcApp.removeQ('${it.id}')">×</button><div class="font-semibold text-sky-400 mb-1 pr-5 text-sm">${it.material}</div><div class="quote-line text-xs">📐 ${it.dimensions} — <strong>${this.t('quantity')}: ${it.qty}</strong></div><div class="breakdown-box"><div class="text-[10px] text-slate-400 mb-1">${this.t('breakdownTitle')}</div>${b}<div class="text-center text-xs text-slate-400 mt-2">${this.t('pricePerUnit')} <span class="text-sky-400 font-medium">${unitPrice} €</span></div><div class="breakdown-total">${this.t('posTotal')} ${it.qty} ${this.t('unitQty')}: <strong>${itemDisplay.toFixed(2)} €</strong></div></div></div>`;
 });
-const ft = Utils.roundTo5(Math.max(gt, 15));
+const ft = Math.max(Utils.roundTo5(gt * this.priceMultiplier), 15);
 c.innerHTML=h; document.getElementById('totalAmount').textContent = ft.toFixed(2) + ' €';
 document.getElementById('priceExVat').textContent = ft.toFixed(2) + ' €';
 document.getElementById('vatAmount').textContent = Utils.round(ft * 0.21, 2).toFixed(2) + ' €';
@@ -933,16 +948,17 @@ mn.textContent = gt < 15 ? `(${this.t('minApplied')})` : ''; mn.classList.toggle
 },
 removeQ(id){ if(confirm(this.t('removeItem'))){ this.quoteItems = this.quoteItems.filter(i => i.id !== id); this.renderQuoteItems(); } },
 clearQuote(){ if(confirm(this.t('clearConfirm'))){ this.quoteItems=[]; document.getElementById('clientName').value=''; this.renderQuoteItems(); } },
+doLogout(){ try { sessionStorage.removeItem('printin_auth'); sessionStorage.removeItem('printin_role'); } catch(e) {} this.priceMultiplier = 1.0; this.userRole = 'manager'; document.getElementById('clientBadge').classList.add('hidden'); document.getElementById('authModal').classList.remove('hidden'); },
 
 exportPDF(){
 if(!this.quoteItems.length) return;
 let rows = ''; let rowNum = 1;
 this.quoteItems.forEach((item) => { item.breakdown.forEach((line, bIdx) => { const isMain = bIdx === 0;
 const totalQty = Utils.round(line.qty * item.qty, 3);
-const totalSubtotal = Utils.round(line.subtotal * item.qty, 2);
-rows += `<tr style="${isMain ? 'background:#fafafa;' : ''}"><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top; width:30px;">${isMain ? rowNum + '.' : ''}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top;">${isMain ? `<strong>${item.material}</strong><br><span style="color:#64748b; font-weight:400;">${item.dimensions} • ${this.t('quantity')}: ${item.qty} vnt.</span><br><span style="color:#94a3b8; font-size:9px;">${this.t('lblPlotas')}: ${item.areaM2.toFixed(5)}m² (${this.t('lblViso')}: ${Utils.round(item.areaM2*item.qty,2)}m²) | ${this.t('lblPerimetras')}: ${item.perimM.toFixed(3)}m (${this.t('lblViso')}: ${Utils.round(item.perimM*item.qty,2)}m)</span>` : `<span style="padding-left:12px; color:#475569;">${line.label}</span>`}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:center; width:60px;">${totalQty} ${line.unit}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; width:90px;">${line.rate} ${line.unitPriceLabel}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; font-weight:600; width:70px;">${totalSubtotal.toFixed(2)} €</td></tr>`; }); rowNum++; });
+const totalSubtotal = Utils.round(line.subtotal * item.qty * this.priceMultiplier, 2);
+rows += `<tr style="${isMain ? 'background:#fafafa;' : ''}"><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top; width:30px;">${isMain ? rowNum + '.' : ''}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top;">${isMain ? `<strong>${item.material}</strong><br><span style="color:#64748b; font-weight:400;">${item.dimensions} • ${this.t('quantity')}: ${item.qty} vnt.</span><br><span style="color:#94a3b8; font-size:9px;">${this.t('lblPlotas')}: ${item.areaM2.toFixed(5)}m² (${this.t('lblViso')}: ${Utils.round(item.areaM2*item.qty,2)}m²) | ${this.t('lblPerimetras')}: ${item.perimM.toFixed(3)}m (${this.t('lblViso')}: ${Utils.round(item.perimM*item.qty,2)}m)</span>` : `<span style="padding-left:12px; color:#475569;">${line.label}</span>`}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:center; width:60px;">${totalQty} ${line.unit}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; width:90px;">${Utils.round(line.rate * this.priceMultiplier, 2)} ${line.unitPriceLabel}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; font-weight:600; width:70px;">${totalSubtotal.toFixed(2)} €</td></tr>`; }); rowNum++; });
 const grandTotal = this.quoteItems.reduce((s,i)=>s+i.rawTotal,0);
-const finalTotal = Utils.roundTo5(Math.max(grandTotal, 15));
+const finalTotal = Math.max(Utils.roundTo5(grandTotal * this.priceMultiplier), 15);
 const finalTotalVAT = Utils.round(finalTotal * 1.21, 2);
 const clientName = document.getElementById('clientName').value.trim() || 'Kliento pavadinimas';
 document.getElementById('print-area').innerHTML = `<div style="font-family: 'Segoe UI', Roboto, Arial, sans-serif; padding: 25px 30px; background: #fff; color: #111;"><div style="text-align:center; margin-bottom: 20px; border-bottom: 2px solid #0ea5e9; padding-bottom: 15px;"><h1 style="margin:0; font-size: 15px; color: #0ea5e9; font-weight:700; text-transform:uppercase; letter-spacing:1px;">${this.t('commercialProposal')}</h1><p style="margin: 6px 0 0; font-size: 16px; color: #0f172a; font-weight: 600;">${clientName}</p><p style="margin: 4px 0 0; font-size: 11px; color: #64748b;">${new Date().toLocaleString('lt-LT')}</p></div><table style="width:100%; border-collapse: collapse; font-size: 10px; margin-bottom: 15px;"><thead><tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;"><th style="padding: 6px; text-align: left;">#</th><th style="padding: 6px; text-align: left;">${this.t('pdf_name')}</th><th style="padding: 6px; text-align: center;">${this.t('pdf_qty')}</th><th style="padding: 6px; text-align: right;">${this.t('pdf_price')}</th><th style="padding: 6px; text-align: right;">${this.t('pdf_total')}</th></tr></thead><tbody>${rows}</tbody></table><div style="display: flex; justify-content: flex-end; margin-top: 10px;"><div style="background: #f8fafc; padding: 10px 16px; border-radius: 6px; text-align: right; min-width: 180px; border: 1px solid #e2e8f0;"><div style="font-size: 10px; color: #64748b;">${this.t('pdf_exVat')}</div><div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">${finalTotal.toFixed(2)} €</div><div style="font-size: 10px; color: #64748b;">${this.t('pdf_vat')}</div><div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">${Utils.round(finalTotal * 0.21,2).toFixed(2)} €</div><div style="font-size: 11px; color: #64748b; margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 4px;">${this.t('pdf_incVat')}</div><div style="font-size: 18px; font-weight: 700; color: #0284c7;">${finalTotalVAT.toFixed(2)} €</div>${grandTotal < 15 ? `<div style="font-size: 9px; color: #ef4444; margin-top: 3px;">${this.t('pdf_minOrder')}</div>` : ''}</div></div><div style="margin-top: 20px; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 9px; color: #94a3b8; text-align: center;">${this.t('pdf_footer')}</div></div>`;
@@ -971,6 +987,14 @@ document.getElementById('refContent').innerHTML=h;
 },
 init() {
 try {
+try {
+    const storedRole = sessionStorage.getItem('printin_role');
+    if (storedRole === 'client') {
+        this.priceMultiplier = 1.25; this.userRole = 'client';
+        const badge = document.getElementById('clientBadge');
+        if (badge) badge.classList.remove('hidden');
+    }
+} catch(e) {}
 this.setLang('lt');
 document.getElementById('pvcThickness').addEventListener('input', ()=>{ this.updateMaterialPrice(); this.updateServices(); this.updateLivePreview(); });
 document.getElementById('millingThickness').addEventListener('input', ()=>{ this.updateLivePreview(); });
