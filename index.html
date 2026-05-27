@@ -1649,8 +1649,9 @@ this.generateRefTable();
 // ===== Supabase + Admin Panel =====
 const SB_URL='https://pudvzrxxnggqnymesxqi.supabase.co',SB_KEY='sb_publishable_qPyF60qXm-_JQdjDgF0X2w_4nRspbZV';
 const SupabaseService={
-  async fetch(t){try{const r=await fetch(SB_URL+'/rest/v1/'+t+'?select=*',{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});return r.ok?await r.json():[];}catch(e){console.warn('Supabase fetch fail:',t,e);return [];}},
-  async upsert(t,d){try{const r=await fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify(Array.isArray(d)?d:[d])});if(!r.ok){console.warn('Supabase upsert HTTP',r.status,await r.text());}return r.ok;}catch(e){console.warn('Supabase upsert fail:',t,e);return false;}}
+  async fetch(t,filter=''){try{const r=await fetch(SB_URL+'/rest/v1/'+t+'?select=*'+(filter?'&'+filter:''),{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});return r.ok?await r.json():[];}catch(e){console.warn('Supabase fetch fail:',t,e);return [];}},
+  async upsert(t,d){try{const r=await fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify(Array.isArray(d)?d:[d])});if(!r.ok){console.warn('Supabase upsert HTTP',r.status,await r.text());}return r.ok;}catch(e){console.warn('Supabase upsert fail:',t,e);return false;}},
+  async delete(t,filter){try{const r=await fetch(SB_URL+'/rest/v1/'+t+'?'+filter,{method:'DELETE',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});return r.ok;}catch(e){console.warn('Supabase delete fail:',t,e);return false;}}
 };
 
 // Helper: безопасный HTML-escape (защита от XSS)
@@ -1667,7 +1668,7 @@ const AdminPanel={
   },
   open(){if(!this._guard())return;this.render();document.getElementById('adminModal').classList.add('active');},
   close(){document.getElementById('adminModal').classList.remove('active');},
-  showTab(t){['materials','services','settings'].forEach(x=>{document.getElementById('atab-'+x).classList.toggle('hidden',x!==t);const b=document.getElementById('abtn-'+x);b.classList.toggle('bg-sky-600',x===t);b.classList.toggle('text-white',x===t);});},
+  showTab(t){['materials','services','allowed','settings'].forEach(x=>{const el=document.getElementById('atab-'+x);if(el)el.classList.toggle('hidden',x!==t);const b=document.getElementById('abtn-'+x);if(b){b.classList.toggle('bg-sky-600',x===t);b.classList.toggle('text-white',x===t);}});},
   notify(m,type='ok'){const n=document.getElementById('adminNotif');if(n){n.textContent=m;n.className='text-xs px-2 py-1 rounded border '+(type==='err'?'bg-rose-500/20 text-rose-300 border-rose-500/30':'bg-emerald-500/20 text-emerald-300 border-emerald-500/30');n.classList.remove('hidden');setTimeout(()=>n.classList.add('hidden'),2500);}},
   // Обновление UI калькулятора после сохранения цен
   _refreshCalcUI(){
@@ -1678,9 +1679,9 @@ const AdminPanel={
       CalcApp.renderQuoteItems();
     } catch(e) { console.warn('Refresh UI failed', e); }
   },
-  render(){this.renderMaterials();this.renderServices();this.renderSettings();this.showTab('materials');},
+  render(){this.renderMaterials();this.renderServices();this.renderSettings();this.renderAllowed();this.showTab('materials');},
   renderMaterials(){
-    let h='';
+    let h='<div class="mb-3 flex justify-end"><button onclick="AdminPanel.openAddMat()" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded">+ Add material</button></div>';
     Object.entries(Config.materials).forEach(([cat,mats])=>{
       h+='<div class="mb-4"><h3 class="text-xs font-semibold text-sky-400 mb-1">'+escHtml(CalcApp.t('cat_'+cat)||cat)+'</h3><table class="w-full text-xs"><tr class="text-slate-400 border-b border-slate-700"><th class="text-left p-1 w-28">ID</th><th class="text-left p-1">Pavadinimas LT</th><th class="text-left p-1">Name EN</th><th class="text-right p-1">Kaina</th><th class="text-right p-1">4+0</th><th class="text-right p-1">4+4</th><th class="text-right p-1" title="Ширина рулона (mm)">MaxW</th><th class="p-1"></th></tr>';
       mats.forEach(m=>{
@@ -1694,7 +1695,7 @@ const AdminPanel={
           +'<td class="p-1"><input type="number" step="0.01" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-20 text-right text-xs" data-mid="'+escHtml(m.id)+'" data-f="p40" value="'+(m.price40!=null?m.price40:'')+'"></td>'
           +'<td class="p-1"><input type="number" step="0.01" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-20 text-right text-xs" data-mid="'+escHtml(m.id)+'" data-f="p44" value="'+(m.price44!=null?m.price44:'')+'"></td>'
           +'<td class="p-1"><input type="number" step="1" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-20 text-right text-xs" data-mid="'+escHtml(m.id)+'" data-f="mw" value="'+(m.maxWidth!=null?m.maxWidth:'')+'" title="Ширина рулона (mm)"></td>'
-          +'<td class="p-1"><button onclick="AdminPanel.saveMat(\''+escHtml(m.id)+'\',\''+escHtml(cat)+'\')" class="text-[10px] bg-sky-600 hover:bg-sky-500 text-white px-2 py-0.5 rounded">Save</button></td>'
+          +'<td class="p-1 whitespace-nowrap"><button onclick="AdminPanel.saveMat(\''+escHtml(m.id)+'\',\''+escHtml(cat)+'\')" class="text-[10px] bg-sky-600 hover:bg-sky-500 text-white px-2 py-0.5 rounded">Save</button> <button onclick="AdminPanel.delMat(\''+escHtml(m.id)+'\',\''+escHtml(cat)+'\')" class="text-[10px] bg-rose-600 hover:bg-rose-500 text-white px-2 py-0.5 rounded">×</button></td>'
           +'</tr>';
       });
       h+='</table></div>';
@@ -1702,21 +1703,165 @@ const AdminPanel={
     document.getElementById('atab-materials').innerHTML=h;
   },
   renderServices(){
-    let h='<table class="w-full text-xs"><tr class="text-slate-400 border-b border-slate-700"><th class="text-left p-1">ID</th><th class="text-left p-1">LT</th><th class="text-left p-1">EN</th><th class="text-right p-1">Kaina</th><th class="p-1"></th></tr>';
+    let h='<div class="mb-3 flex justify-end"><button onclick="AdminPanel.openAddSvc()" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded">+ Add service</button></div>';
+    h+='<table class="w-full text-xs"><tr class="text-slate-400 border-b border-slate-700"><th class="text-left p-1">ID</th><th class="text-left p-1">LT</th><th class="text-left p-1">EN</th><th class="text-right p-1">Kaina</th><th class="text-left p-1">Vnt</th><th class="p-1"></th></tr>';
     Config.servicesList.forEach(s=>{
       const nlt=(typeof s.name==='object')?s.name.lt:s.name;
       const nen=(typeof s.name==='object')?s.name.en:'';
       const rate=s.pricePerM||s.pricePerM2||s.price||0;
+      const unit=s.unit||(s.pricePerM!==undefined?'perimeter':s.pricePerM2!==undefined?'area':'custom');
       h+='<tr class="border-b border-slate-700/30 hover:bg-slate-800/20">'
         +'<td class="p-1 text-[10px] text-slate-500 font-mono">'+escHtml(s.id)+'</td>'
         +'<td class="p-1"><input class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-full text-xs" data-sid="'+escHtml(s.id)+'" data-f="lt" value="'+escHtml(nlt)+'"></td>'
         +'<td class="p-1"><input class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-full text-xs" data-sid="'+escHtml(s.id)+'" data-f="en" value="'+escHtml(nen)+'"></td>'
         +'<td class="p-1"><input type="number" step="0.01" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-24 text-right text-xs" data-sid="'+escHtml(s.id)+'" data-f="price" value="'+rate+'"></td>'
-        +'<td class="p-1"><button onclick="AdminPanel.saveSvc(\''+escHtml(s.id)+'\')" class="text-[10px] bg-sky-600 hover:bg-sky-500 text-white px-2 py-0.5 rounded">Save</button></td>'
+        +'<td class="p-1 text-[10px] text-slate-400">'+escHtml(unit)+'</td>'
+        +'<td class="p-1 whitespace-nowrap"><button onclick="AdminPanel.saveSvc(\''+escHtml(s.id)+'\')" class="text-[10px] bg-sky-600 hover:bg-sky-500 text-white px-2 py-0.5 rounded">Save</button> <button onclick="AdminPanel.delSvc(\''+escHtml(s.id)+'\')" class="text-[10px] bg-rose-600 hover:bg-rose-500 text-white px-2 py-0.5 rounded">×</button></td>'
         +'</tr>';
     });
     h+='</table>';
     document.getElementById('atab-services').innerHTML=h;
+  },
+  // ===== ALLOWED SERVICES (матрица материал × услуга) =====
+  renderAllowed(){
+    const el=document.getElementById('atab-allowed'); if(!el) return;
+    const mats=Object.entries(Config.materials).flatMap(([cat,ms])=>ms.map(m=>({...m,_cat:cat})));
+    const svcs=Config.servicesList;
+    let h='<div class="text-xs text-slate-400 mb-2">Отметьте какие услуги доступны для каждого материала. Изменения сохраняются автоматически.</div>';
+    h+='<div class="overflow-auto" style="max-height:60vh;"><table class="text-xs border-collapse"><thead><tr><th class="sticky top-0 left-0 z-20 bg-slate-900 p-1 text-left border-b border-r border-slate-700 min-w-[240px]">Material</th>';
+    svcs.forEach(s=>{const sn=(typeof s.name==="object")?s.name.lt:s.name;h+='<th class="sticky top-0 z-10 bg-slate-900 p-1 border-b border-slate-700 text-center" style="writing-mode:vertical-rl;transform:rotate(180deg);min-width:36px;height:120px;white-space:nowrap;" title="'+escHtml(sn)+'">'+escHtml(sn)+'</th>';});
+    h+='</tr></thead><tbody>';
+    mats.forEach(m=>{
+      const mn=(typeof m.name==="object")?m.name.lt:m.name;
+      const allowed=Config.allowedServices[m.id]||[];
+      h+='<tr class="hover:bg-slate-800/20"><td class="sticky left-0 bg-slate-900/95 p-1 border-r border-b border-slate-700 text-[10px]"><div class="font-mono text-slate-500">'+escHtml(m.id)+'</div><div class="text-slate-300">'+escHtml(mn)+'</div></td>';
+      svcs.forEach(s=>{
+        const checked=allowed.includes(s.id)?'checked':'';
+        h+='<td class="text-center border-b border-slate-700 p-0.5"><input type="checkbox" '+checked+' onchange="AdminPanel.toggleAllowed(\''+escHtml(m.id)+'\',\''+escHtml(s.id)+'\',this.checked)" class="cursor-pointer"></td>';
+      });
+      h+='</tr>';
+    });
+    h+='</tbody></table></div>';
+    el.innerHTML=h;
+  },
+  async toggleAllowed(matId, svcId, enabled){
+    if(!this._guard()) return;
+    const arr = Config.allowedServices[matId] = Config.allowedServices[matId] || [];
+    if(enabled) {
+      if(!arr.includes(svcId)) arr.push(svcId);
+    } else {
+      const i = arr.indexOf(svcId); if(i>=0) arr.splice(i,1);
+    }
+    // Сохраняем в Supabase
+    const ok = await SupabaseService.upsert('allowed_services', {material_id:matId, service_id:svcId, enabled:!!enabled});
+    if(ok){ this.notify('Saved!'); this._refreshCalcUI(); }
+    else this.notify('Error!','err');
+  },
+  // ===== ADD / DELETE MATERIAL =====
+  openAddMat(){
+    if(!this._guard()) return;
+    const cats=Object.keys(Config.materials);
+    const cOpts=cats.map(c=>'<option value="'+escHtml(c)+'">'+escHtml(CalcApp.t('cat_'+c)||c)+'</option>').join('');
+    const tOpts=['single','dual','banner','film','film_uv','paper','canvas','cardboard','rigid','pvc_dynamic','pvc_fixed','acrylic','uv_service','milling_service','standalone_service','standalone_lam'].map(t=>'<option value="'+t+'">'+t+'</option>').join('');
+    const f=document.getElementById('addMatForm');
+    f.innerHTML='<h3 class="text-sm font-semibold text-emerald-400 mb-2">+ Add new material</h3>'
+      +'<div class="grid grid-cols-2 gap-2 text-xs">'
+      +'<div><label class="calc-label-sm">ID (unique)</label><input id="newMat_id" class="calc-input-sm" placeholder="my_material_id"></div>'
+      +'<div><label class="calc-label-sm">Category</label><select id="newMat_cat" class="calc-input-sm">'+cOpts+'</select></div>'
+      +'<div><label class="calc-label-sm">Name LT</label><input id="newMat_lt" class="calc-input-sm"></div>'
+      +'<div><label class="calc-label-sm">Name EN</label><input id="newMat_en" class="calc-input-sm"></div>'
+      +'<div><label class="calc-label-sm">Type</label><select id="newMat_type" class="calc-input-sm">'+tOpts+'</select></div>'
+      +'<div><label class="calc-label-sm">Max width (mm)</label><input id="newMat_mw" type="number" class="calc-input-sm" placeholder="optional"></div>'
+      +'<div><label class="calc-label-sm">Price (€/m²)</label><input id="newMat_price" type="number" step="0.01" class="calc-input-sm" placeholder="for single"></div>'
+      +'<div><label class="calc-label-sm">Price 4+0 / 4+4</label><div class="flex gap-1"><input id="newMat_p40" type="number" step="0.01" class="calc-input-sm" placeholder="4+0"><input id="newMat_p44" type="number" step="0.01" class="calc-input-sm" placeholder="4+4"></div></div>'
+      +'</div>'
+      +'<div class="flex gap-2 mt-3 justify-end"><button onclick="AdminPanel.closeAddMat()" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded">Cancel</button><button onclick="AdminPanel.addMat()" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded">Add</button></div>';
+    document.getElementById('addFormModal').classList.add('active');
+  },
+  closeAddMat(){ document.getElementById('addFormModal').classList.remove('active'); document.getElementById('addMatForm').innerHTML=''; },
+  async addMat(){
+    if(!this._guard()) return;
+    const v=id=>document.getElementById(id).value.trim();
+    const id=v('newMat_id'), cat=v('newMat_cat'), nlt=v('newMat_lt'), nen=v('newMat_en'), type=v('newMat_type');
+    const mw=v('newMat_mw'), price=v('newMat_price'), p40=v('newMat_p40'), p44=v('newMat_p44');
+    if(!id) return this.notify('ID required','err');
+    if(!/^[a-z0-9_]+$/i.test(id)) return this.notify('ID: only letters/digits/underscore','err');
+    // Проверка дубликата
+    if(Object.values(Config.materials).flat().some(m=>m.id===id)) return this.notify('ID already exists','err');
+    const ok=await SupabaseService.upsert('prices',{id,type:'material',category:cat,name_lt:nlt,name_en:nen,price:price?+price:null,price40:p40?+p40:null,price44:p44?+p44:null,max_width:mw?+mw:null});
+    if(!ok) return this.notify('Save error','err');
+    const newMat={id, name:{lt:nlt,en:nen}, type};
+    if(price) newMat.price=+price;
+    if(p40) newMat.price40=+p40;
+    if(p44) newMat.price44=+p44;
+    if(mw) newMat.maxWidth=+mw;
+    Config.materials[cat].push(newMat);
+    Config.allowedServices[id]=Config.allowedServices[id]||[];
+    this.closeAddMat();
+    this.renderMaterials(); this.renderAllowed();
+    this.notify('Added!');
+    this._refreshCalcUI();
+  },
+  async delMat(id, cat){
+    if(!this._guard()) return;
+    if(!confirm('Delete material "'+id+'"?')) return;
+    const ok=await SupabaseService.delete('prices', 'id=eq.'+encodeURIComponent(id));
+    if(!ok) return this.notify('Delete error','err');
+    // Также удаляем allowed_services записи
+    await SupabaseService.delete('allowed_services', 'material_id=eq.'+encodeURIComponent(id));
+    Config.materials[cat] = Config.materials[cat].filter(m=>m.id!==id);
+    delete Config.allowedServices[id];
+    this.renderMaterials(); this.renderAllowed();
+    this.notify('Deleted');
+    this._refreshCalcUI();
+  },
+  // ===== ADD / DELETE SERVICE =====
+  openAddSvc(){
+    if(!this._guard()) return;
+    const f=document.getElementById('addMatForm');
+    f.innerHTML='<h3 class="text-sm font-semibold text-emerald-400 mb-2">+ Add new service</h3>'
+      +'<div class="grid grid-cols-2 gap-2 text-xs">'
+      +'<div><label class="calc-label-sm">ID (unique)</label><input id="newSvc_id" class="calc-input-sm" placeholder="my_service_id"></div>'
+      +'<div><label class="calc-label-sm">Unit</label><select id="newSvc_unit" class="calc-input-sm"><option value="perimeter">perimeter (€/m)</option><option value="area">area (€/m²)</option><option value="custom">custom</option></select></div>'
+      +'<div><label class="calc-label-sm">Name LT</label><input id="newSvc_lt" class="calc-input-sm" placeholder="✂️ Pavadinimas"></div>'
+      +'<div><label class="calc-label-sm">Name EN</label><input id="newSvc_en" class="calc-input-sm"></div>'
+      +'<div class="col-span-2"><label class="calc-label-sm">Price</label><input id="newSvc_price" type="number" step="0.01" class="calc-input-sm" placeholder="0.00"></div>'
+      +'</div>'
+      +'<div class="flex gap-2 mt-3 justify-end"><button onclick="AdminPanel.closeAddMat()" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded">Cancel</button><button onclick="AdminPanel.addSvc()" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded">Add</button></div>';
+    document.getElementById('addFormModal').classList.add('active');
+  },
+  async addSvc(){
+    if(!this._guard()) return;
+    const v=id=>document.getElementById(id).value.trim();
+    const id=v('newSvc_id'), nlt=v('newSvc_lt'), nen=v('newSvc_en'), unit=v('newSvc_unit'), price=+v('newSvc_price')||0;
+    if(!id) return this.notify('ID required','err');
+    if(!/^[a-z0-9_]+$/i.test(id)) return this.notify('ID: only letters/digits/underscore','err');
+    if(Config.servicesList.some(s=>s.id===id)) return this.notify('ID already exists','err');
+    const ok=await SupabaseService.upsert('prices',{id,type:'service',category:null,name_lt:nlt,name_en:nen,price,price40:null,price44:null,max_width:null});
+    if(!ok) return this.notify('Save error','err');
+    const newSvc={id, name:{lt:nlt,en:nen}, unit};
+    if(unit==='perimeter') newSvc.pricePerM=price;
+    else if(unit==='area') newSvc.pricePerM2=price;
+    else newSvc.price=price;
+    Config.servicesList.push(newSvc);
+    this.closeAddMat();
+    this.renderServices(); this.renderAllowed();
+    this.notify('Added!');
+    this._refreshCalcUI();
+  },
+  async delSvc(id){
+    if(!this._guard()) return;
+    if(!confirm('Delete service "'+id+'"?')) return;
+    const ok=await SupabaseService.delete('prices', 'id=eq.'+encodeURIComponent(id));
+    if(!ok) return this.notify('Delete error','err');
+    await SupabaseService.delete('allowed_services', 'service_id=eq.'+encodeURIComponent(id));
+    Config.servicesList = Config.servicesList.filter(s=>s.id!==id);
+    Object.keys(Config.allowedServices).forEach(mid=>{
+      Config.allowedServices[mid] = (Config.allowedServices[mid]||[]).filter(sid=>sid!==id);
+    });
+    this.renderServices(); this.renderAllowed();
+    this.notify('Deleted');
+    this._refreshCalcUI();
   },
   renderSettings(){
     const mm=Config.minOrderManager!=null?Config.minOrderManager:15;
@@ -1783,12 +1928,21 @@ const AdminPanel={
         if(p.type==='material'){
           const m=Object.values(Config.materials).flat().find(x=>x.id===p.id);
           if(m){
+            // Обновляем существующий
             if(p.name_lt&&typeof m.name==='object')m.name.lt=p.name_lt;
             if(p.name_en&&typeof m.name==='object')m.name.en=p.name_en;
             if(p.price!=null)m.price=p.price;
             if(p.price40!=null)m.price40=p.price40;
             if(p.price44!=null)m.price44=p.price44;
             if(p.max_width!=null)m.maxWidth=p.max_width;
+          } else if(p.category && Config.materials[p.category]) {
+            // Новый материал из БД, которого нет в hardcoded Config
+            const nm={id:p.id, name:{lt:p.name_lt||p.id, en:p.name_en||p.id}, type:'single'};
+            if(p.price!=null)nm.price=p.price;
+            if(p.price40!=null){nm.price40=p.price40;nm.type='dual';}
+            if(p.price44!=null)nm.price44=p.price44;
+            if(p.max_width!=null)nm.maxWidth=p.max_width;
+            Config.materials[p.category].push(nm);
           }
         }
         else if(p.type==='service'){
@@ -1801,6 +1955,10 @@ const AdminPanel={
               else if(s.pricePerM2!==undefined)s.pricePerM2=p.price;
               else s.price=p.price;
             }
+          } else {
+            // Новый сервис из БД
+            const ns={id:p.id, name:{lt:p.name_lt||p.id, en:p.name_en||p.id}, unit:'perimeter', pricePerM:p.price||0};
+            Config.servicesList.push(ns);
           }
         }
       });
@@ -1809,6 +1967,20 @@ const AdminPanel={
         if(s.key==='min_order_manager')Config.minOrderManager=+s.value;
         if(s.key==='min_order_client')Config.minOrderClient=+s.value;
         if(s.key==='client_markup')Config.clientMarkup=+s.value;
+      });
+      // allowed_services: подгружаем матрицу разрешённых услуг
+      const allowed=await SupabaseService.fetch('allowed_services');
+      allowed.forEach(a=>{
+        const mid=a.material_id, sid=a.service_id;
+        if(!mid||!sid) return;
+        Config.allowedServices[mid] = Config.allowedServices[mid] || [];
+        const arr = Config.allowedServices[mid];
+        if(a.enabled === false) {
+          // disabled — убираем из allowed если есть
+          const i = arr.indexOf(sid); if(i>=0) arr.splice(i,1);
+        } else {
+          if(!arr.includes(sid)) arr.push(sid);
+        }
       });
     }catch(e){console.warn('Supabase load error',e);}
   }
@@ -1827,17 +1999,26 @@ window.addEventListener('load', () => {
 </script>
 
 <div id="adminModal" class="modal" onclick="if(event.target===this)AdminPanel.close()">
-<div class="modal-content" style="max-width:1000px;max-height:92vh;">
+<div class="modal-content" style="max-width:1100px;max-height:92vh;">
 <button class="close-modal" onclick="AdminPanel.close()">x</button>
-<div class="flex items-center gap-3 mb-3"><h2 class="text-lg font-semibold text-white">Admin Panel</h2><span id="adminNotif" class="hidden text-xs px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"></span></div>
+<div class="flex items-center gap-3 mb-3"><h2 class="text-lg font-semibold text-white">Admin Panel</h2><span id="adminNotif" class="hidden text-xs px-2 py-1 rounded border"></span></div>
 <div class="flex gap-2 mb-3">
 <button id="abtn-materials" onclick="AdminPanel.showTab('materials')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-600 transition">Medžiagos</button>
 <button id="abtn-services" onclick="AdminPanel.showTab('services')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-600 transition">Paslaugos</button>
+<button id="abtn-allowed" onclick="AdminPanel.showTab('allowed')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-600 transition">Leidžiamos</button>
 <button id="abtn-settings" onclick="AdminPanel.showTab('settings')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-600 transition">Nustatymai</button>
 </div>
 <div id="atab-materials" class="overflow-y-auto" style="max-height:70vh;"></div>
 <div id="atab-services" class="hidden overflow-y-auto" style="max-height:70vh;"></div>
+<div id="atab-allowed" class="hidden overflow-y-auto" style="max-height:70vh;"></div>
 <div id="atab-settings" class="hidden overflow-y-auto" style="max-height:70vh;"></div>
+</div></div>
+
+<!-- Add Material/Service Form Modal -->
+<div id="addFormModal" class="modal" onclick="if(event.target===this)AdminPanel.closeAddMat()">
+<div class="modal-content" style="max-width:560px;">
+<button class="close-modal" onclick="AdminPanel.closeAddMat()">x</button>
+<div id="addMatForm"></div>
 </div></div>
 
 </body>
