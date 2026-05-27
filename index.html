@@ -1632,9 +1632,22 @@ try {
 } catch(e) {}
 this.setLang('lt');
 this.applyRoleUI();
-// Slušaem login knopku - posle uspešnoj autorizacii peresmatrivaem rezhim
-const loginBtn = document.getElementById('loginBtn');
-if(loginBtn) loginBtn.addEventListener('click', () => { setTimeout(() => this.applyRoleUI(), 150); });
+// Slušaem zakrytie auth modal'ki (čerez klik ILI Enter — pokryvaet oba puti)
+const authM = document.getElementById('authModal');
+if(authM) {
+  const obs = new MutationObserver(() => {
+    if(authM.classList.contains('hidden')) {
+      // Posle uspešnoj autorizacii — sinkhroniziruem userRole iz sessionStorage
+      try {
+        const r = sessionStorage.getItem('printin_role');
+        if(r === 'admin') { this.priceMultiplier = 1.0; this.userRole = 'admin'; }
+        else if(r === 'client') { this.priceMultiplier = Config.clientMarkup || 1.25; this.userRole = 'client'; }
+      } catch(e) {}
+      this.applyRoleUI();
+    }
+  });
+  obs.observe(authM, { attributes: true, attributeFilter: ['class'] });
+}
 document.getElementById('pvcThickness').addEventListener('input', ()=>{ this.updateMaterialPrice(); this.updateServices(); this.updateLivePreview(); });
 document.getElementById('millingThickness').addEventListener('input', ()=>{ this.updateLivePreview(); });
 document.getElementById('weldingLength').addEventListener('input', () => this.updateLivePreview());
