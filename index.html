@@ -241,7 +241,9 @@ body.client-mode .wizard-mode { display: flex; }
 <button onclick="CalcApp.setLang('en')" class="px-2 py-0.5 text-xs rounded transition" id="btn-en">EN</button>
 </div>
 <button onclick="CalcApp.toggleModal(true)" data-i18n="btn_pricesModal" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition">📖 Kainos</button>
+<button id="adminBtn" onclick="AdminPanel.open()" class="hidden text-xs bg-fuchsia-600/20 hover:bg-fuchsia-600/30 px-3 py-1.5 rounded-lg border border-fuchsia-500/40 text-fuchsia-300 transition">⚙️ Admin</button>
 <span id="clientBadge" class="hidden text-xs font-semibold px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">CLIENT MODE</span>
+<span id="adminBadge" class="hidden text-xs font-semibold px-2 py-1 rounded bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30">ADMIN MODE</span>
 <button onclick="CalcApp.doLogout()" data-i18n="btn_logout" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition text-slate-400 hover:text-slate-200">⎋ Išeiti</button>
 </div>
 </header>
@@ -1326,7 +1328,7 @@ const isEditing = this.editingId === it.id;
 h+=`<div class="quote-item${isEditing ? ' editing' : ''}" data-id="${it.id}"><button class="absolute top-1.5 right-2 text-rose-400 hover:text-rose-300 text-lg leading-none" onclick="CalcApp.removeQ('${it.id}')" title="${this.t('removeItem')}">×</button><button class="btn-edit-small" onclick="CalcApp.editQuoteItem('${it.id}')" title="${this.t('edit')}">✏️</button><div class="font-semibold text-sky-400 mb-1 pr-14 text-sm">${it.material}</div><div class="quote-line text-xs">📐 ${it.dimensions} — <strong>${this.t('quantity')}: ${it.qty}</strong></div><div class="breakdown-box"><div class="text-[10px] text-slate-400 mb-1">${this.t('breakdownTitle')}</div>${b}<div class="text-center text-xs text-slate-400 mt-2">${this.t('pricePerUnit')} <span class="text-sky-400 font-medium">${unitPrice} €</span></div><div class="breakdown-total">${this.t('posTotal')} ${it.qty} ${this.t('unitQty')}: <strong>${itemDisplay.toFixed(2)} €</strong></div></div></div>`;
 });
 // Min order — fiksirovannyj: manager 15€, client 20€ (NE umnozhaetsa na markup)
-const minOrder = this.userRole === 'client' ? 20 : 15; const afterMarkup = Utils.roundTo5(gt * this.priceMultiplier); const ft = Math.max(afterMarkup, minOrder); const minApplied = afterMarkup < minOrder;
+const minOrder = this.userRole === 'client' ? (Config.minOrderClient!=null?Config.minOrderClient:20) : (Config.minOrderManager!=null?Config.minOrderManager:15); const afterMarkup = Utils.roundTo5(gt * this.priceMultiplier); const ft = Math.max(afterMarkup, minOrder); const minApplied = afterMarkup < minOrder;
 c.innerHTML=h;
 this.animateCounter('totalAmount', ft);
 document.getElementById('priceExVat').textContent = ft.toFixed(2) + ' €';
@@ -1351,7 +1353,7 @@ animateCounter(elId, targetValue) {
 },
 removeQ(id){ if(confirm(this.t('removeItem'))){ this.quoteItems = this.quoteItems.filter(i => i.id !== id); if(this.editingId===id) this.cancelEdit(); this.renderQuoteItems(); this.toast(this.t('itemRemoved'),'success'); } },
 clearQuote(){ if(confirm(this.t('clearConfirm'))){ this.quoteItems=[]; const cn=document.getElementById('clientName'); if(cn) cn.value=''; const wcn=document.getElementById('wizClientName'); if(wcn) wcn.value=''; this.cancelEdit(); this.renderQuoteItems(); } },
-doLogout(){ try { sessionStorage.removeItem('printin_auth'); sessionStorage.removeItem('printin_role'); } catch(e) {} this.priceMultiplier = 1.0; this.userRole = 'manager'; document.getElementById('clientBadge').classList.add('hidden'); document.body.classList.remove('client-mode'); document.getElementById('authModal').classList.remove('hidden'); },
+doLogout(){ try { sessionStorage.removeItem('printin_auth'); sessionStorage.removeItem('printin_role'); } catch(e) {} this.priceMultiplier = 1.0; this.userRole = 'manager'; document.getElementById('clientBadge').classList.add('hidden'); document.getElementById('adminBadge')?.classList.add('hidden'); document.getElementById('adminBtn')?.classList.add('hidden'); document.body.classList.remove('client-mode'); document.getElementById('authModal').classList.remove('hidden'); },
 
 exportPDF(){
 if(!this.quoteItems.length) return;
@@ -1361,7 +1363,7 @@ const totalQty = Utils.round(line.qty * item.qty, 3);
 const totalSubtotal = Utils.round(line.subtotal * item.qty * this.priceMultiplier, 2);
 rows += `<tr style="${isMain ? 'background:#fafafa;' : ''}"><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top; width:30px;">${isMain ? rowNum + '.' : ''}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top;">${isMain ? `<strong>${item.material}</strong><br><span style="color:#64748b; font-weight:400;">${item.dimensions} • ${this.t('quantity')}: ${item.qty} vnt.</span><br><span style="color:#94a3b8; font-size:9px;">${this.t('lblPlotas')}: ${item.areaM2.toFixed(5)}m² (${this.t('lblViso')}: ${Utils.round(item.areaM2*item.qty,2)}m²) | ${this.t('lblPerimetras')}: ${item.perimM.toFixed(3)}m (${this.t('lblViso')}: ${Utils.round(item.perimM*item.qty,2)}m)</span>` : `<span style="padding-left:12px; color:#475569;">${line.label}</span>`}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:center; width:60px;">${totalQty} ${line.unit}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; width:90px;">${Utils.round(line.rate * this.priceMultiplier, 2)} ${line.unitPriceLabel}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; font-weight:600; width:70px;">${totalSubtotal.toFixed(2)} €</td></tr>`; }); rowNum++; });
 const grandTotal = this.quoteItems.reduce((s,i)=>s+i.rawTotal,0);
-const minOrderPdf = this.userRole === 'client' ? 20 : 15; const finalTotal = Math.max(Utils.roundTo5(grandTotal * this.priceMultiplier), minOrderPdf);
+const minOrderPdf = this.userRole === 'client' ? (Config.minOrderClient!=null?Config.minOrderClient:20) : (Config.minOrderManager!=null?Config.minOrderManager:15); const finalTotal = Math.max(Utils.roundTo5(grandTotal * this.priceMultiplier), minOrderPdf);
 const finalTotalVAT = Utils.round(finalTotal * 1.21, 2);
 const clientName = document.getElementById('clientName').value.trim() || this.t('clientNamePh').replace(/^👤\s*/, '');
 const dateLocale = this.currentLang === 'lt' ? 'lt-LT' : 'en-GB';
@@ -1408,7 +1410,7 @@ buildQuoteHtml() {
     const totalSubtotal = Utils.round(line.subtotal * item.qty * this.priceMultiplier, 2);
     rows += `<tr style="${isMain ? 'background:#fafafa;' : ''}"><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top; width:30px;">${isMain ? rowNum + '.' : ''}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; vertical-align:top;">${isMain ? `<strong>${item.material}</strong><br><span style="color:#64748b; font-weight:400;">${item.dimensions} • ${this.t('quantity')}: ${item.qty} ${this.t('unitQty')}.</span>` : `<span style="padding-left:12px; color:#475569;">${line.label}</span>`}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:center; width:60px;">${totalQty} ${line.unit}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; width:90px;">${Utils.round(line.rate * this.priceMultiplier, 2)} ${line.unitPriceLabel}</td><td style="padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:10px; text-align:right; font-weight:600; width:70px;">${totalSubtotal.toFixed(2)} €</td></tr>`; }); rowNum++; });
   const grandTotal = this.quoteItems.reduce((s,i)=>s+i.rawTotal,0);
-  const minOrderPdf = this.userRole === 'client' ? 20 : 15;
+  const minOrderPdf = this.userRole === 'client' ? (Config.minOrderClient!=null?Config.minOrderClient:20) : (Config.minOrderManager!=null?Config.minOrderManager:15);
   const finalTotal = Math.max(Utils.roundTo5(grandTotal * this.priceMultiplier), minOrderPdf);
   const finalTotalVAT = Utils.round(finalTotal * 1.21, 2);
   const cnEl = document.getElementById('clientName') || document.getElementById('wizClientName');
@@ -1493,7 +1495,13 @@ async sendEmail() {
 applyRoleUI() {
   // Wizard otklyuchen po prosbe pol'zovatelja — vse vidjat manager UI
   document.body.classList.remove('client-mode');
-  // Esli budushchij toggle ponadobitsa - dostatochno vernut' add('client-mode') dlja client roli
+  // Admin UI: показ кнопки + бейджа только для admin
+  const adminBtn = document.getElementById('adminBtn');
+  const adminBadge = document.getElementById('adminBadge');
+  const clientBadge = document.getElementById('clientBadge');
+  if(adminBtn) adminBtn.classList.toggle('hidden', this.userRole !== 'admin');
+  if(adminBadge) adminBadge.classList.toggle('hidden', this.userRole !== 'admin');
+  if(clientBadge) clientBadge.classList.toggle('hidden', this.userRole !== 'client');
 },
 renderWizardQuote() {
   const list = document.getElementById('wizQuoteList');
@@ -1511,7 +1519,7 @@ renderWizardQuote() {
     h += `<div class="wiz-quote-item"><span class="x" onclick="CalcApp.removeQ('${it.id}')">×</span><div class="name">${it.material}</div><div class="meta">📐 ${it.dimensions} • ${it.qty} ${this.t('unitQty')}</div><div class="price">${itemDisplay.toFixed(2)} €</div></div>`;
   });
   list.innerHTML = h;
-  const minOrder = this.userRole === 'client' ? 20 : 15;
+  const minOrder = this.userRole === 'client' ? (Config.minOrderClient!=null?Config.minOrderClient:20) : (Config.minOrderManager!=null?Config.minOrderManager:15);
   const ft = Math.max(Utils.roundTo5(gt * this.priceMultiplier), minOrder);
   document.getElementById('wizQuoteTotal').textContent = ft.toFixed(2) + ' €';
   totalBox?.classList.remove('hidden');
@@ -1618,8 +1626,8 @@ try {
     const storedRole = sessionStorage.getItem('printin_role');
     if (storedRole === 'client') {
         this.priceMultiplier = 1.25; this.userRole = 'client';
-        const badge = document.getElementById('clientBadge');
-        if (badge) badge.classList.remove('hidden');
+    } else if (storedRole === 'admin') {
+        this.priceMultiplier = 1.0; this.userRole = 'admin';
     }
 } catch(e) {}
 this.setLang('lt');
@@ -1638,32 +1646,55 @@ this.generateRefTable();
 }
 };
 
+// ===== Supabase + Admin Panel =====
 const SB_URL='https://pudvzrxxnggqnymesxqi.supabase.co',SB_KEY='sb_publishable_qPyF60qXm-_JQdjDgF0X2w_4nRspbZV';
 const SupabaseService={
-  async fetch(t){try{const r=await fetch(SB_URL+'/rest/v1/'+t+'?select=*',{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});return r.ok?await r.json():[];}catch(e){return [];}},
-  async upsert(t,d){try{const r=await fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify(Array.isArray(d)?d:[d])});return r.ok;}catch(e){return false;}}
+  async fetch(t){try{const r=await fetch(SB_URL+'/rest/v1/'+t+'?select=*',{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});return r.ok?await r.json():[];}catch(e){console.warn('Supabase fetch fail:',t,e);return [];}},
+  async upsert(t,d){try{const r=await fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify(Array.isArray(d)?d:[d])});if(!r.ok){console.warn('Supabase upsert HTTP',r.status,await r.text());}return r.ok;}catch(e){console.warn('Supabase upsert fail:',t,e);return false;}}
 };
+
+// Helper: безопасный HTML-escape (защита от XSS)
+const escHtml = (s) => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
 const AdminPanel={
-  open(){this.render();document.getElementById('adminModal').classList.add('active');},
+  // Защита: AdminPanel доступен ТОЛЬКО админу
+  _guard(){
+    if(typeof CalcApp==='undefined' || CalcApp.userRole !== 'admin'){
+      console.warn('AdminPanel: доступ только для роли admin');
+      return false;
+    }
+    return true;
+  },
+  open(){if(!this._guard())return;this.render();document.getElementById('adminModal').classList.add('active');},
   close(){document.getElementById('adminModal').classList.remove('active');},
   showTab(t){['materials','services','settings'].forEach(x=>{document.getElementById('atab-'+x).classList.toggle('hidden',x!==t);const b=document.getElementById('abtn-'+x);b.classList.toggle('bg-sky-600',x===t);b.classList.toggle('text-white',x===t);});},
-  notify(m){const n=document.getElementById('adminNotif');if(n){n.textContent=m;n.classList.remove('hidden');setTimeout(()=>n.classList.add('hidden'),2500);}},
+  notify(m,type='ok'){const n=document.getElementById('adminNotif');if(n){n.textContent=m;n.className='text-xs px-2 py-1 rounded border '+(type==='err'?'bg-rose-500/20 text-rose-300 border-rose-500/30':'bg-emerald-500/20 text-emerald-300 border-emerald-500/30');n.classList.remove('hidden');setTimeout(()=>n.classList.add('hidden'),2500);}},
+  // Обновление UI калькулятора после сохранения цен
+  _refreshCalcUI(){
+    try {
+      CalcApp.generateRefTable();
+      CalcApp.updateMaterialPrice && CalcApp.updateMaterialPrice();
+      CalcApp.updateLivePreview();
+      CalcApp.renderQuoteItems();
+    } catch(e) { console.warn('Refresh UI failed', e); }
+  },
   render(){this.renderMaterials();this.renderServices();this.renderSettings();this.showTab('materials');},
   renderMaterials(){
     let h='';
     Object.entries(Config.materials).forEach(([cat,mats])=>{
-      h+='<div class="mb-4"><h3 class="text-xs font-semibold text-sky-400 mb-1">'+(CalcApp.t('cat_'+cat)||cat)+'</h3><table class="w-full text-xs"><tr class="text-slate-400 border-b border-slate-700"><th class="text-left p-1 w-28">ID</th><th class="text-left p-1">Pavadinimas LT</th><th class="text-left p-1">Name EN</th><th class="text-right p-1">Kaina</th><th class="text-right p-1">4+0</th><th class="text-right p-1">4+4</th><th class="p-1"></th></tr>';
+      h+='<div class="mb-4"><h3 class="text-xs font-semibold text-sky-400 mb-1">'+escHtml(CalcApp.t('cat_'+cat)||cat)+'</h3><table class="w-full text-xs"><tr class="text-slate-400 border-b border-slate-700"><th class="text-left p-1 w-28">ID</th><th class="text-left p-1">Pavadinimas LT</th><th class="text-left p-1">Name EN</th><th class="text-right p-1">Kaina</th><th class="text-right p-1">4+0</th><th class="text-right p-1">4+4</th><th class="text-right p-1" title="Ширина рулона (mm)">MaxW</th><th class="p-1"></th></tr>';
       mats.forEach(m=>{
-        const nlt=((typeof m.name==='object')?m.name.lt:m.name)||'';
-        const nen=((typeof m.name==='object')?m.name.en:'')||'';
+        const nlt=(typeof m.name==='object')?m.name.lt:m.name;
+        const nen=(typeof m.name==='object')?m.name.en:'';
         h+='<tr class="border-b border-slate-700/30 hover:bg-slate-800/20">'
-          +'<td class="p-1 text-[10px] text-slate-500 font-mono">'+m.id+'</td>'
-          +'<td class="p-1"><input class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-full text-xs" data-mid="'+m.id+'" data-f="lt" value="'+nlt.replace(/"/g,'&quot;')+'"></td>'
-          +'<td class="p-1"><input class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-full text-xs" data-mid="'+m.id+'" data-f="en" value="'+nen.replace(/"/g,'&quot;')+'"></td>'
-          +'<td class="p-1"><input type="number" step="0.01" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-20 text-right text-xs" data-mid="'+m.id+'" data-f="price" value="'+(m.price!=null?m.price:'')+'"></td>'
-          +'<td class="p-1"><input type="number" step="0.01" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-20 text-right text-xs" data-mid="'+m.id+'" data-f="p40" value="'+(m.price40!=null?m.price40:'')+'"></td>'
-          +'<td class="p-1"><input type="number" step="0.01" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-20 text-right text-xs" data-mid="'+m.id+'" data-f="p44" value="'+(m.price44!=null?m.price44:'')+'"></td>'
-          +'<td class="p-1"><button onclick="AdminPanel.saveMat(\''+m.id+'\',\''+cat+'\')" class="text-[10px] bg-sky-600 hover:bg-sky-500 text-white px-2 py-0.5 rounded">Save</button></td>'
+          +'<td class="p-1 text-[10px] text-slate-500 font-mono">'+escHtml(m.id)+'</td>'
+          +'<td class="p-1"><input class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-full text-xs" data-mid="'+escHtml(m.id)+'" data-f="lt" value="'+escHtml(nlt)+'"></td>'
+          +'<td class="p-1"><input class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-full text-xs" data-mid="'+escHtml(m.id)+'" data-f="en" value="'+escHtml(nen)+'"></td>'
+          +'<td class="p-1"><input type="number" step="0.01" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-20 text-right text-xs" data-mid="'+escHtml(m.id)+'" data-f="price" value="'+(m.price!=null?m.price:'')+'"></td>'
+          +'<td class="p-1"><input type="number" step="0.01" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-20 text-right text-xs" data-mid="'+escHtml(m.id)+'" data-f="p40" value="'+(m.price40!=null?m.price40:'')+'"></td>'
+          +'<td class="p-1"><input type="number" step="0.01" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-20 text-right text-xs" data-mid="'+escHtml(m.id)+'" data-f="p44" value="'+(m.price44!=null?m.price44:'')+'"></td>'
+          +'<td class="p-1"><input type="number" step="1" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-20 text-right text-xs" data-mid="'+escHtml(m.id)+'" data-f="mw" value="'+(m.maxWidth!=null?m.maxWidth:'')+'" title="Ширина рулона (mm)"></td>'
+          +'<td class="p-1"><button onclick="AdminPanel.saveMat(\''+escHtml(m.id)+'\',\''+escHtml(cat)+'\')" class="text-[10px] bg-sky-600 hover:bg-sky-500 text-white px-2 py-0.5 rounded">Save</button></td>'
           +'</tr>';
       });
       h+='</table></div>';
@@ -1673,57 +1704,126 @@ const AdminPanel={
   renderServices(){
     let h='<table class="w-full text-xs"><tr class="text-slate-400 border-b border-slate-700"><th class="text-left p-1">ID</th><th class="text-left p-1">LT</th><th class="text-left p-1">EN</th><th class="text-right p-1">Kaina</th><th class="p-1"></th></tr>';
     Config.servicesList.forEach(s=>{
-      const nlt=((typeof s.name==='object')?s.name.lt:s.name)||'';
-      const nen=((typeof s.name==='object')?s.name.en:'')||'';
+      const nlt=(typeof s.name==='object')?s.name.lt:s.name;
+      const nen=(typeof s.name==='object')?s.name.en:'';
       const rate=s.pricePerM||s.pricePerM2||s.price||0;
       h+='<tr class="border-b border-slate-700/30 hover:bg-slate-800/20">'
-        +'<td class="p-1 text-[10px] text-slate-500 font-mono">'+s.id+'</td>'
-        +'<td class="p-1"><input class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-full text-xs" data-sid="'+s.id+'" data-f="lt" value="'+nlt.replace(/"/g,'&quot;')+'"></td>'
-        +'<td class="p-1"><input class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-full text-xs" data-sid="'+s.id+'" data-f="en" value="'+nen.replace(/"/g,'&quot;')+'"></td>'
-        +'<td class="p-1"><input type="number" step="0.01" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-24 text-right text-xs" data-sid="'+s.id+'" data-f="price" value="'+rate+'"></td>'
-        +'<td class="p-1"><button onclick="AdminPanel.saveSvc(\''+s.id+'\')" class="text-[10px] bg-sky-600 hover:bg-sky-500 text-white px-2 py-0.5 rounded">Save</button></td>'
+        +'<td class="p-1 text-[10px] text-slate-500 font-mono">'+escHtml(s.id)+'</td>'
+        +'<td class="p-1"><input class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-full text-xs" data-sid="'+escHtml(s.id)+'" data-f="lt" value="'+escHtml(nlt)+'"></td>'
+        +'<td class="p-1"><input class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-full text-xs" data-sid="'+escHtml(s.id)+'" data-f="en" value="'+escHtml(nen)+'"></td>'
+        +'<td class="p-1"><input type="number" step="0.01" class="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 w-24 text-right text-xs" data-sid="'+escHtml(s.id)+'" data-f="price" value="'+rate+'"></td>'
+        +'<td class="p-1"><button onclick="AdminPanel.saveSvc(\''+escHtml(s.id)+'\')" class="text-[10px] bg-sky-600 hover:bg-sky-500 text-white px-2 py-0.5 rounded">Save</button></td>'
         +'</tr>';
     });
     h+='</table>';
     document.getElementById('atab-services').innerHTML=h;
   },
   renderSettings(){
+    const mm=Config.minOrderManager!=null?Config.minOrderManager:15;
+    const mc=Config.minOrderClient!=null?Config.minOrderClient:20;
+    const mk=Config.clientMarkup!=null?Config.clientMarkup:1.25;
     document.getElementById('atab-settings').innerHTML='<div class="space-y-4 max-w-sm mt-2">'
-      +'<div><label class="calc-label-sm">Min. uzsakymas (manager) EUR</label><input type="number" id="set_mm" value="'+(Config.minOrderManager||15)+'" class="calc-input-sm"></div>'
-      +'<div><label class="calc-label-sm">Min. uzsakymas (client) EUR</label><input type="number" id="set_mc" value="'+(Config.minOrderClient||20)+'" class="calc-input-sm"></div>'
-      +'<div><label class="calc-label-sm">Kliento priemoka (1.25 = +25%)</label><input type="number" id="set_mk" step="0.01" value="'+(Config.clientMarkup||1.25)+'" class="calc-input-sm"></div>'
-      +'<button onclick="AdminPanel.saveSettings()" class="btn-calc btn-add">Save Settings</button></div>';
+      +'<div><label class="calc-label-sm">Min. užsakymas (manager) EUR</label><input type="number" id="set_mm" value="'+mm+'" class="calc-input-sm"></div>'
+      +'<div><label class="calc-label-sm">Min. užsakymas (client) EUR</label><input type="number" id="set_mc" value="'+mc+'" class="calc-input-sm"></div>'
+      +'<div><label class="calc-label-sm">Kliento priemoka (1.25 = +25%)</label><input type="number" id="set_mk" step="0.01" value="'+mk+'" class="calc-input-sm"></div>'
+      +'<button onclick="AdminPanel.saveSettings()" class="btn-calc btn-add">Save Settings</button>'
+      +'<div class="text-[10px] text-slate-500 mt-2">⚠️ priemoka применится при следующем входе клиента.</div></div>';
   },
   async saveMat(id,cat){
+    if(!this._guard())return;
     const g=f=>document.querySelector('[data-mid="'+id+'"][data-f="'+f+'"]')?.value;
-    const ok=await SupabaseService.upsert('prices',{id,type:'material',category:cat,name_lt:g('lt'),name_en:g('en'),price:g('price')!==''?+g('price'):null,price40:g('p40')!==''?+g('p40'):null,price44:g('p44')!==''?+g('p44'):null});
-    if(ok){const m=Object.values(Config.materials).flat().find(x=>x.id===id);if(m){if(typeof m.name==='object'){m.name.lt=g('lt');m.name.en=g('en');}if(g('price')!=='')m.price=+g('price');if(g('p40')!=='')m.price40=+g('p40');if(g('p44')!=='')m.price44=+g('p44');}this.notify('Saved!');}else this.notify('Error!');
+    const payload={id,type:'material',category:cat,name_lt:g('lt'),name_en:g('en'),price:g('price')!==''?+g('price'):null,price40:g('p40')!==''?+g('p40'):null,price44:g('p44')!==''?+g('p44'):null,max_width:g('mw')!==''?+g('mw'):null};
+    const ok=await SupabaseService.upsert('prices',payload);
+    if(ok){
+      const m=Object.values(Config.materials).flat().find(x=>x.id===id);
+      if(m){
+        if(typeof m.name==='object'){m.name.lt=g('lt');m.name.en=g('en');}
+        if(g('price')!=='')m.price=+g('price'); else if(g('price')==='')delete m.price;
+        if(g('p40')!=='')m.price40=+g('p40'); else if(g('p40')==='')delete m.price40;
+        if(g('p44')!=='')m.price44=+g('p44'); else if(g('p44')==='')delete m.price44;
+        if(g('mw')!=='')m.maxWidth=+g('mw'); else if(g('mw')==='')delete m.maxWidth;
+      }
+      this.notify('Saved!');
+      this._refreshCalcUI();
+    } else this.notify('Error!','err');
   },
   async saveSvc(id){
+    if(!this._guard())return;
     const g=f=>document.querySelector('[data-sid="'+id+'"][data-f="'+f+'"]')?.value;
     const price=+g('price');
     const ok=await SupabaseService.upsert('prices',{id,type:'service',name_lt:g('lt'),name_en:g('en'),price});
-    if(ok){const s=Config.servicesList.find(x=>x.id===id);if(s){if(typeof s.name==='object'){s.name.lt=g('lt');s.name.en=g('en');}if(s.pricePerM!==undefined)s.pricePerM=price;else if(s.pricePerM2!==undefined)s.pricePerM2=price;else s.price=price;}this.notify('Saved!');}else this.notify('Error!');
+    if(ok){
+      const s=Config.servicesList.find(x=>x.id===id);
+      if(s){
+        if(typeof s.name==='object'){s.name.lt=g('lt');s.name.en=g('en');}
+        if(s.pricePerM!==undefined)s.pricePerM=price;
+        else if(s.pricePerM2!==undefined)s.pricePerM2=price;
+        else s.price=price;
+      }
+      this.notify('Saved!');
+      this._refreshCalcUI();
+    } else this.notify('Error!','err');
   },
   async saveSettings(){
+    if(!this._guard())return;
     const mm=+document.getElementById('set_mm').value||15,mc=+document.getElementById('set_mc').value||20,mk=+document.getElementById('set_mk').value||1.25;
     const ok=await SupabaseService.upsert('settings',[{key:'min_order_manager',value:String(mm)},{key:'min_order_client',value:String(mc)},{key:'client_markup',value:String(mk)}]);
-    if(ok){Config.minOrderManager=mm;Config.minOrderClient=mc;Config.clientMarkup=mk;this.notify('Saved!');}else this.notify('Error!');
+    if(ok){
+      Config.minOrderManager=mm;Config.minOrderClient=mc;Config.clientMarkup=mk;
+      // Если текущий пользователь — клиент, обновим markup в живую
+      if(CalcApp.userRole==='client') CalcApp.priceMultiplier=mk;
+      this.notify('Saved!');
+      this._refreshCalcUI();
+    } else this.notify('Error!','err');
   },
   async loadFromSupabase(){
     try{
       const prices=await SupabaseService.fetch('prices');
       prices.forEach(p=>{
-        if(p.type==='material'){const m=Object.values(Config.materials).flat().find(x=>x.id===p.id);if(m){if(p.name_lt&&typeof m.name==='object')m.name.lt=p.name_lt;if(p.name_en&&typeof m.name==='object')m.name.en=p.name_en;if(p.price!=null)m.price=p.price;if(p.price40!=null)m.price40=p.price40;if(p.price44!=null)m.price44=p.price44;}}
-        else if(p.type==='service'){const s=Config.servicesList.find(x=>x.id===p.id);if(s){if(p.name_lt&&typeof s.name==='object')s.name.lt=p.name_lt;if(p.name_en&&typeof s.name==='object')s.name.en=p.name_en;if(p.price!=null){if(s.pricePerM!==undefined)s.pricePerM=p.price;else if(s.pricePerM2!==undefined)s.pricePerM2=p.price;else s.price=p.price;}}}
+        if(p.type==='material'){
+          const m=Object.values(Config.materials).flat().find(x=>x.id===p.id);
+          if(m){
+            if(p.name_lt&&typeof m.name==='object')m.name.lt=p.name_lt;
+            if(p.name_en&&typeof m.name==='object')m.name.en=p.name_en;
+            if(p.price!=null)m.price=p.price;
+            if(p.price40!=null)m.price40=p.price40;
+            if(p.price44!=null)m.price44=p.price44;
+            if(p.max_width!=null)m.maxWidth=p.max_width;
+          }
+        }
+        else if(p.type==='service'){
+          const s=Config.servicesList.find(x=>x.id===p.id);
+          if(s){
+            if(p.name_lt&&typeof s.name==='object')s.name.lt=p.name_lt;
+            if(p.name_en&&typeof s.name==='object')s.name.en=p.name_en;
+            if(p.price!=null){
+              if(s.pricePerM!==undefined)s.pricePerM=p.price;
+              else if(s.pricePerM2!==undefined)s.pricePerM2=p.price;
+              else s.price=p.price;
+            }
+          }
+        }
       });
       const settings=await SupabaseService.fetch('settings');
-      settings.forEach(s=>{if(s.key==='min_order_manager')Config.minOrderManager=+s.value;if(s.key==='min_order_client')Config.minOrderClient=+s.value;if(s.key==='client_markup')Config.clientMarkup=+s.value;});
-    }catch(e){console.log('Supabase load error',e);}
+      settings.forEach(s=>{
+        if(s.key==='min_order_manager')Config.minOrderManager=+s.value;
+        if(s.key==='min_order_client')Config.minOrderClient=+s.value;
+        if(s.key==='client_markup')Config.clientMarkup=+s.value;
+      });
+    }catch(e){console.warn('Supabase load error',e);}
   }
 };
 
-window.addEventListener('load', () => { AdminPanel.loadFromSupabase().then(() => CalcApp.init()); });
+// Init: калькулятор стартует СРАЗУ (без задержки от Supabase), а данные подгружаются параллельно.
+// После загрузки обновляем UI чтобы новые цены/настройки сразу применились.
+window.addEventListener('load', () => {
+  CalcApp.init();
+  AdminPanel.loadFromSupabase().then(() => {
+    // Применяем настройки клиентского markup'а если он залогинен
+    if(CalcApp.userRole==='client' && Config.clientMarkup!=null) CalcApp.priceMultiplier=Config.clientMarkup;
+    try { CalcApp.generateRefTable(); CalcApp.updateLivePreview(); CalcApp.renderQuoteItems(); } catch(e){}
+  });
+});
 </script>
 
 <div id="adminModal" class="modal" onclick="if(event.target===this)AdminPanel.close()">
