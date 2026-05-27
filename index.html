@@ -583,7 +583,8 @@ body.client-mode .wizard-mode { display: flex; }
     function _h(s) { try { return btoa(s); } catch(e) { return ''; } }
     const CREDS = [
         { id: _h('print in'), pass: _h('print in'), markup: 1.0, role: 'manager' },
-        { id: _h('print in'), pass: _h('miroslav'), markup: 1.25, role: 'client' }
+        { id: _h('print in'), pass: _h('miroslav'), markup: 1.25, role: 'client' },
+        { id: _h('print in'), pass: _h('print in admin'), markup: 1.0, role: 'admin' }
     ];
     function doLogin() {
         const inputId = idEl.value.trim().toLowerCase();
