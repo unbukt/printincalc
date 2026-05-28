@@ -942,7 +942,7 @@ document.getElementById('linearCutWrap').classList.toggle('hidden', method !== '
 this.updateLivePreview();
 },
 updateMaterialPrice() {
-if(this.currentMaterial?.type==='pvc_dynamic') this.currentMaterial._currentPrice = (parseFloat(document.getElementById('pvcThickness').value)||3)*(this.currentMaterial.price or 3);;
+if(this.currentMaterial?.type==='pvc_dynamic') this.currentMaterial._currentPrice = (parseFloat(document.getElementById('pvcThickness').value)||3)*(this.currentMaterial.price||3);
 },
 updateServices() {
 const b = document.getElementById('services'); b.innerHTML='';
@@ -1160,7 +1160,7 @@ bd.push({label:ll, qty:Utils.round(areaM2,5), unit:'m²', rate:lr, unitPriceLabe
 return{material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:bd.reduce((s,x)=>s+x.subtotal,0)*q};
 }
 if(this.currentMaterial.type==='dual'){ const pt=document.getElementById('printType').value; mp=pt==='4+0'?this.currentMaterial.price40:this.currentMaterial.price44; }
-else if(this.currentMaterial.type==='pvc_dynamic'){ th=parseFloat(document.getElementById('pvcThickness').value)||3; mp=th*(this.currentMaterial.price or 3); }
+else if(this.currentMaterial.type==='pvc_dynamic'){ th=parseFloat(document.getElementById('pvcThickness').value)||3; mp=th*(this.currentMaterial.price||3); }
 else if(this.currentMaterial.id==='acrylic'){ th=parseFloat(document.getElementById('acrylicThickness').value)||3; mp=th*14; }
 else mp=this.currentMaterial.price||0;
 if(this.currentMaterial.id==='sub_flag' && document.getElementById('flagReklamine')?.checked) { mp=14; mn += ` (${this.t('lbl_reklamInCalc')})`; }
