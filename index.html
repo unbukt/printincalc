@@ -766,7 +766,7 @@ sublimacija: [
 ],
 rigid: [
 {id:'pvc_1_2',name:{lt:'PVC 1–2 mm',en:'PVC 1–2 mm'},price:6.00,type:'pvc_fixed'},
-{id:'pvc_3_19',name:{lt:'PVC 3–19 mm',en:'PVC 3–19 mm'},type:'pvc_dynamic'},
+{id:'pvc_3_19',name:{lt:'PVC 3–19 mm (baltas)',en:'PVC 3–19 mm (white)'},type:'pvc_dynamic',price:3},{id:'pvc_black',name:{lt:'Juodas PVC',en:'Black PVC'},type:'pvc_dynamic',price:6},
 {id:'alu_comp',name:{lt:'Aliuminio kompozitas',en:'Aluminium composite'},price:20.00,type:'rigid'},
 {id:'alu_brushed',name:{lt:'Braižytas aliuminio kompozitas',en:'Brushed aluminium composite'},price:30.00,type:'rigid'},
 {id:'stadur_10',name:{lt:'Stadur easyprint 10mm',en:'Stadur easyprint 10mm'},price:22.00,type:'rigid'},
@@ -810,7 +810,7 @@ allowedServices: {
 'sub_flag':['cutting','silicone_edge','sewing'], 'sub_satin':['cutting','silicone_edge','sewing'],
 'sub_taft':['cutting','silicone_edge','sewing'], 'sub_elastic':['cutting','silicone_edge','sewing'],
 'sub_paper_print':[], 'sub_calendering':[],
-'pvc_1_2':['cutting'], 'pvc_3_19':[], /* dynamic: overridden in updateServices() based on thickness */
+'pvc_1_2':['cutting'], 'pvc_3_19':[], 'pvc_black':[], /* dynamic: overridden in updateServices() based on thickness */
 'corrugated_3mm':[], 'micro_1_5':[], 'swedboard':['cutting'], 'serimat':['cutting'], 'invercote':['cutting'],
 'alu_comp':['milling'], 'alu_brushed':['milling'], 'stadur_10':['cutting'], 'priplak':['cutting'], 'acrylic':['milling'],'magnet_08':['cutting'],
 'uv_latex':['milling'], 'milling_standalone':[],
@@ -848,7 +848,7 @@ getMatName() {
 if(!this.currentMaterial) return '';
 const nm = this.currentMaterial.name;
 let n = (typeof nm === 'object') ? (nm[this.currentLang] || nm.lt) : nm;
-if(this.currentMaterial.id==='pvc_3_19') n = `PVC ${document.getElementById('pvcThickness').value||3}mm`;
+if(this.currentMaterial.type==='pvc_dynamic') n = `PVC ${document.getElementById('pvcThickness').value||3}mm`;
 else if(this.currentMaterial.id==='acrylic') n = `Organinis stiklas ${document.getElementById('acrylicType').value||'clear'} ${document.getElementById('acrylicThickness').value||3}mm`;
 else if(this.currentMaterial.type==='dual') n += ` (${document.getElementById('printType').value})`;
 if(['film_self','film_auto','film_backlight'].includes(this.currentMaterial.id)) {
@@ -942,7 +942,7 @@ document.getElementById('linearCutWrap').classList.toggle('hidden', method !== '
 this.updateLivePreview();
 },
 updateMaterialPrice() {
-if(this.currentMaterial?.type==='pvc_dynamic') this.currentMaterial._currentPrice = (parseFloat(document.getElementById('pvcThickness').value)||3)*4;
+if(this.currentMaterial?.type==='pvc_dynamic') this.currentMaterial._currentPrice = (parseFloat(document.getElementById('pvcThickness').value)||3)*(this.currentMaterial.price or 3);;
 },
 updateServices() {
 const b = document.getElementById('services'); b.innerHTML='';
@@ -951,7 +951,7 @@ document.getElementById('weldingLengthWrap').classList.add('hidden');
 if(!this.currentMaterial) return;
 
 let effectiveAllowed;
-const isPvc3 = this.currentMaterial.id === 'pvc_3_19';
+const isPvc3 = this.currentMaterial.type === 'pvc_dynamic';
 if(isPvc3) {
 const th = parseFloat(document.getElementById('pvcThickness').value) || 3;
 if(th < 5) effectiveAllowed = ['cutting'];
@@ -1160,7 +1160,7 @@ bd.push({label:ll, qty:Utils.round(areaM2,5), unit:'m²', rate:lr, unitPriceLabe
 return{material:mn, dimensions:`${w}×${h} mm`, qty:q, areaM2, perimM, breakdown:bd, rawTotal:bd.reduce((s,x)=>s+x.subtotal,0)*q};
 }
 if(this.currentMaterial.type==='dual'){ const pt=document.getElementById('printType').value; mp=pt==='4+0'?this.currentMaterial.price40:this.currentMaterial.price44; }
-else if(this.currentMaterial.type==='pvc_dynamic'){ th=parseFloat(document.getElementById('pvcThickness').value)||3; mp=th*3; }
+else if(this.currentMaterial.type==='pvc_dynamic'){ th=parseFloat(document.getElementById('pvcThickness').value)||3; mp=th*(this.currentMaterial.price or 3); }
 else if(this.currentMaterial.id==='acrylic'){ th=parseFloat(document.getElementById('acrylicThickness').value)||3; mp=th*14; }
 else mp=this.currentMaterial.price||0;
 if(this.currentMaterial.id==='sub_flag' && document.getElementById('flagReklamine')?.checked) { mp=14; mn += ` (${this.t('lbl_reklamInCalc')})`; }
