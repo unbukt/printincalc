@@ -240,6 +240,7 @@ body.client-mode .wizard-mode { display: flex; }
 <button onclick="CalcApp.setLang('lt')" class="px-2 py-0.5 text-xs rounded transition bg-sky-600 text-white" id="btn-lt">LT</button>
 <button onclick="CalcApp.setLang('en')" class="px-2 py-0.5 text-xs rounded transition" id="btn-en">EN</button>
 </div>
+<button onclick="ChatBot.toggle()" id="botBtn" class="text-xs bg-violet-800/40 hover:bg-violet-700/50 px-3 py-1.5 rounded-lg border border-violet-500/40 transition text-violet-300">🤖 Bot</button>
 <button id="kainosBtn" onclick="CalcApp.toggleModal(true)" data-i18n="btn_pricesModal" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition">📖 Kainos</button>
 <button id="adminBtn" onclick="AdminPanel.open()" class="hidden text-xs bg-fuchsia-600/20 hover:bg-fuchsia-600/30 px-3 py-1.5 rounded-lg border border-fuchsia-500/40 text-fuchsia-300 transition">⚙️ Admin</button>
 <span id="clientBadge" class="hidden text-xs font-semibold px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">CLIENT MODE</span>
@@ -1884,7 +1885,7 @@ const AdminPanel={
       +'<div><label class="calc-label-sm">Min. užsakymas (manager) EUR</label><input type="number" id="set_mm" value="'+mm+'" class="calc-input-sm"></div>'
       +'<div><label class="calc-label-sm">Min. užsakymas (client) EUR</label><input type="number" id="set_mc" value="'+mc+'" class="calc-input-sm"></div>'
       +'<div><label class="calc-label-sm">Kliento priemoka (1.25 = +25%)</label><input type="number" id="set_mk" step="0.01" value="'+mk+'" class="calc-input-sm"></div>'
-      +'<button onclick="AdminPanel.saveSettings()" class="btn-calc btn-add">Save Settings</button>'
+      +'<div><label class="calc-label-sm">Bot API raktas</label><input type="password" id="set_apikey" placeholder="Iveskite API rakta" style="font-family:monospace;width:100%;" class="calc-input-sm"></div><button onclick="AdminPanel.saveSettings()" class="btn-calc btn-add">Save Settings</button>'
       +'<div class="text-[10px] text-slate-500 mt-2">⚠️ priemoka применится при следующем входе клиента.</div></div>';
   },
   async saveMat(id,cat){
@@ -1924,7 +1925,7 @@ const AdminPanel={
   },
   async saveSettings(){
     if(!this._guard())return;
-    const mm=+document.getElementById('set_mm').value||15,mc=+document.getElementById('set_mc').value||20,mk=+document.getElementById('set_mk').value||1.25;
+    const ak=(document.getElementById('set_apikey')?.value||'').trim();if(ak)localStorage.setItem('printin_bot_key',ak);const mm=+document.getElementById('set_mm').value||15,mc=+document.getElementById('set_mc').value||20,mk=+document.getElementById('set_mk').value||1.25;
     const ok=await SupabaseService.upsert('settings',[{key:'min_order_manager',value:String(mm)},{key:'min_order_client',value:String(mc)},{key:'client_markup',value:String(mk)}]);
     if(ok){
       Config.minOrderManager=mm;Config.minOrderClient=mc;Config.clientMarkup=mk;
@@ -2001,6 +2002,18 @@ const AdminPanel={
 
 // Init: калькулятор стартует СРАЗУ (без задержки от Supabase), а данные подгружаются параллельно.
 // После загрузки обновляем UI чтобы новые цены/настройки сразу применились.
+const ANTHROPIC_KEY=localStorage.getItem('printin_bot_key')||'';
+const ChatBot={history:[],isOpen:false,isLoading:false,
+toggle(){const p=document.getElementById('chatBotPanel');this.isOpen=!this.isOpen;p.style.display=this.isOpen?'flex':'none';if(this.isOpen)setTimeout(()=>document.getElementById('chatInput')?.focus(),100);},
+getSystemPrompt(){const lang=CalcApp?.currentLang||'lt';const mats=[];try{Object.entries(Config.materials).forEach(([c,items])=>{items.forEach(m=>{const nm=typeof m.name==='object'?(m.name[lang]||m.name.lt):m.name;const pr=m.price!=null?m.price+' EUR/m2':m.price40!=null?m.price40+'/'+m.price44+' EUR/m2':'din';mats.push(nm+': '+pr);});});}catch(e){}
+const svcs=[];try{Config.servicesList.forEach(s=>{const nm=typeof s.name==='object'?(s.name[lang]||s.name.lt):s.name;const rt=s.pricePerM!=null?s.pricePerM+' EUR/m':s.pricePerM2!=null?s.pricePerM2+' EUR/m2':(s.price||0)+' EUR';svcs.push(nm+': '+rt);});}catch(e){}
+const mo=(CalcApp?.userRole==='client'?Config?.minOrderClient:Config?.minOrderManager)||15;
+return 'Tu esi Print In kainų skaičiavimo asistentas. Kalbi lietuviškai, angliškai arba rusiškai pagal klientą.\n\nMEDŻIAGOS: '+mats.join('; ')+'\n\nPASLAUGOS: '+svcs.join('; ')+'\n\nSkaičiuok: Plotas(m2)=w*h/1e6, Perimetras(m)=(w+h)*2/1e3\nMin: '+mo+' EUR be PVM, PVM 21%\nRodyk kainą be PVM ir su PVM. Būk trumpas.';},
+addMsg(t,r){const m=document.getElementById('chatMessages');const d=document.createElement('div');d.style.cssText=r==='user'?'background:#7c3aed;border-radius:10px 10px 2px 10px;padding:9px 12px;font-size:12px;color:white;align-self:flex-end;max-width:85%;word-break:break-word;':'background:#0f172a;border-radius:10px 10px 10px 2px;padding:9px 12px;font-size:12px;color:#e2e8f0;border:1px solid rgba(148,163,184,.1);max-width:92%;white-space:pre-wrap;word-break:break-word;';d.textContent=t;m.appendChild(d);m.scrollTop=m.scrollHeight;return d;},
+async send(){const inp=document.getElementById('chatInput');const txt=inp?.value.trim();if(!txt||this.isLoading)return;inp.value='';this.addMsg(txt,'user');this.history.push({role:'user',content:txt});this.isLoading=true;const ld=this.addMsg('⏳','bot');
+try{const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1024,system:this.getSystemPrompt(),messages:this.history})});
+const data=await res.json();const reply=data.content?.[0]?.text||'Klaida.';ld.textContent=reply;this.history.push({role:'assistant',content:reply});}catch(e){ld.textContent='Klaida: '+e.message;}this.isLoading=false;}};
+
 window.addEventListener('load', () => {
   CalcApp.init();
   AdminPanel.loadFromSupabase().then(() => {
@@ -2034,5 +2047,6 @@ window.addEventListener('load', () => {
 <div id="addMatForm"></div>
 </div></div>
 
+<div id="chatBotPanel" style="display:none;flex-direction:column;position:fixed;bottom:0;right:20px;width:360px;height:500px;z-index:9999;background:#1e293b;border:1px solid rgba(99,102,241,.3);border-radius:12px 12px 0 0;box-shadow:0 -8px 32px rgba(0,0,0,.5);"><div style="padding:12px 16px;background:#0f172a;border-bottom:1px solid rgba(148,163,184,.15);border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;"><span style="color:#a78bfa;font-weight:600;font-size:13px;">🤖 Print In Asistentas</span><button onclick="ChatBot.toggle()" style="color:#64748b;background:none;border:none;cursor:pointer;font-size:20px;padding:0;">×</button></div><div id="chatMessages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;"><div style="background:#0f172a;border-radius:10px;padding:10px 12px;font-size:12px;color:#94a3b8;border:1px solid rgba(148,163,184,.1);max-width:90%;">Sveiki! Galiu padėti apskaičiuoti spausdinimo kainą. Aprašykite medžiagą, dydį ir kiekį 😊</div></div><div style="padding:10px;border-top:1px solid rgba(148,163,184,.1);display:flex;gap:8px;flex-shrink:0;"><input id="chatInput" type="text" placeholder="Rašykite čia... / Write here..." style="flex:1;background:#0f172a;border:1px solid rgba(148,163,184,.2);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:12px;outline:none;" onkeydown="if(event.key==='Enter')ChatBot.send()"><button onclick="ChatBot.send()" style="background:#7c3aed;color:white;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;font-weight:bold;">→</button></div></div>
 </body>
 </html>
