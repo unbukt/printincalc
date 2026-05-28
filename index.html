@@ -240,7 +240,7 @@ body.client-mode .wizard-mode { display: flex; }
 <button onclick="CalcApp.setLang('lt')" class="px-2 py-0.5 text-xs rounded transition bg-sky-600 text-white" id="btn-lt">LT</button>
 <button onclick="CalcApp.setLang('en')" class="px-2 py-0.5 text-xs rounded transition" id="btn-en">EN</button>
 </div>
-<button onclick="CalcApp.toggleModal(true)" data-i18n="btn_pricesModal" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition">📖 Kainos</button>
+<button id="kainosBtn" onclick="CalcApp.toggleModal(true)" data-i18n="btn_pricesModal" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition">📖 Kainos</button>
 <button id="adminBtn" onclick="AdminPanel.open()" class="hidden text-xs bg-fuchsia-600/20 hover:bg-fuchsia-600/30 px-3 py-1.5 rounded-lg border border-fuchsia-500/40 text-fuchsia-300 transition">⚙️ Admin</button>
 <span id="clientBadge" class="hidden text-xs font-semibold px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">CLIENT MODE</span>
 <span id="adminBadge" class="hidden text-xs font-semibold px-2 py-1 rounded bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30">ADMIN MODE</span>
@@ -599,7 +599,7 @@ body.client-mode .wizard-mode { display: flex; }
                 CalcApp.priceMultiplier = user.markup;
                 CalcApp.userRole = user.role;
                 const badge = document.getElementById('clientBadge');
-                if (badge) badge.classList.toggle('hidden', user.role !== 'client');
+                if (badge) badge.classList.toggle('hidden', user.role !== 'client'); const kb=document.getElementById('kainosBtn'); if(kb) kb.classList.toggle('hidden', user.role === 'client');
             }
         } else {
             err.classList.add('show'); passEl.value = ''; passEl.focus();
@@ -1353,7 +1353,7 @@ animateCounter(elId, targetValue) {
 },
 removeQ(id){ if(confirm(this.t('removeItem'))){ this.quoteItems = this.quoteItems.filter(i => i.id !== id); if(this.editingId===id) this.cancelEdit(); this.renderQuoteItems(); this.toast(this.t('itemRemoved'),'success'); } },
 clearQuote(){ if(confirm(this.t('clearConfirm'))){ this.quoteItems=[]; const cn=document.getElementById('clientName'); if(cn) cn.value=''; const wcn=document.getElementById('wizClientName'); if(wcn) wcn.value=''; this.cancelEdit(); this.renderQuoteItems(); } },
-doLogout(){ try { sessionStorage.removeItem('printin_auth'); sessionStorage.removeItem('printin_role'); } catch(e) {} this.priceMultiplier = 1.0; this.userRole = 'manager'; document.getElementById('clientBadge').classList.add('hidden'); document.getElementById('adminBadge')?.classList.add('hidden'); document.getElementById('adminBtn')?.classList.add('hidden'); document.body.classList.remove('client-mode'); document.getElementById('authModal').classList.remove('hidden'); },
+doLogout(){ try { sessionStorage.removeItem('printin_auth'); sessionStorage.removeItem('printin_role'); } catch(e) {} this.priceMultiplier = 1.0; this.userRole = 'manager'; document.getElementById('clientBadge').classList.add('hidden'); const kbl=document.getElementById('kainosBtn'); if(kbl) kbl.classList.remove('hidden'); document.getElementById('adminBadge')?.classList.add('hidden'); document.getElementById('adminBtn')?.classList.add('hidden'); document.body.classList.remove('client-mode'); document.getElementById('authModal').classList.remove('hidden'); },
 
 exportPDF(){
 if(!this.quoteItems.length) return;
