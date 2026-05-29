@@ -2119,7 +2119,13 @@ ${svcs}
 PATARIMAI klientui:
 Jei klausia "kas tinka X" - rekomenduok 1-2 medziagas, trumpai (1 sakinys kodel).
 Jei klausia "kokia kaina" - paimk dydi/kieki, paskaiciuok, pateik galutine kaina ${isClient?'(klientui)':''}.
-Jei truksta info - paklausk TIK to ko truksta (dydis? medziaga? kiekis?).`;
+Jei truksta info - paklausk TIK to ko truksta (dydis? medziaga? kiekis?).
+UV=LATEX: "Latex" ir "UV" spauda - tas pats procesas, tos pacios kainos.
+LAMINAVIMAS priedas/m2: Ekonominis=+2, 2D Auto=+5, 3D Auto=+10, Grindų neslidus=+8. Auto plėvelė - laminuoti būtina.
+ORGANINIS STIKLAS kaina: storis_mm x 14 EUR/m2 (3mm=42, 5mm=70, 6mm=84, 10mm=140). Tipai: skaidrus(clear), baltas(white_opaque), pieno(milk_white). Storiai: 2,3,4,5,6,10mm.
+RIGID UV SPAUDA taikoma: PVC, acrylic, alu kompozitas, stadur, priplak. Priedai/m2: CMYK 4+0=+10, 4+4=+20, CMYK+W 5+0=+18, 5+5=+36. Extras: Neon/Balta/Lakas=+10, Brailio=+100.
+DVIPUSĖ MEDZIAGOS (blockout,backlit,sub_block360): klientui reikia paklausti - vienpusė (price40) ar dvipusė (price44) spauda?
+MAKS PLOTIS: Tentas 500g=5.1m, Blockout=3.2m, Mesh=5m, Backlit=5m, Blockout audinys=3.15m, Banner audinys=3.2m, Taftas=1.5m.`;
   },
   addMsg(t,r){
     const m=document.getElementById('chatMessages');
