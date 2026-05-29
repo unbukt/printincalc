@@ -2264,7 +2264,8 @@ MAKS PLOTIS: Tentas 500g=5.1m, Blockout=3.2m, Mesh=5m, Backlit=5m, Blockout audi
         return;
       }
       const reply=data.content?.[0]?.text||'Klaida: tuscias atsakymas.';
-      ld.textContent=reply;
+      ld.remove();
+      this.addMsg(reply,'bot');
       this.history.push({role:'assistant',content:reply});
     }catch(e){
       ld.textContent='Klaida: '+e.message;
