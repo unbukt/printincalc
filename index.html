@@ -2008,128 +2008,216 @@ const AdminPanel={
 
 // Init: калькулятор стартует СРАЗУ (без задержки от Supabase), а данные подгружаются параллельно.
 // После загрузки обновляем UI чтобы новые цены/настройки сразу применились.
-// ===== ChatBot: использует Supabase Edge Function chat-proxy =====
-// API ключ Anthropic хранится в Supabase secrets (ANTHROPIC_API_KEY) - не виден на клиенте
+// ===== ChatBot v3: Sonnet 4.6 + Tool Use + Prompt Caching + Hybrid =====
+// Архитектура:
+//  - Sonnet 4.6 для точной математики и понимания
+//  - Tool Use: structured FILL output (надёжнее regex)
+//  - Prompt caching: -90% стоимости на повторных запросах
+//  - History limit: последние 12 сообщений
+//  - Calculator считает математику локально (бот только parsing + рекомендации)
+//  - Цены показываются в perspective роли (markup для клиента)
 const ChatBot={
-  history:[], isOpen:false, isLoading:false,
+  history:[], isOpen:false, isLoading:false, _pendingFills:null,
+  MODEL: 'claude-sonnet-4-6',
+  MAX_HISTORY: 12,
   toggle(){
     const p=document.getElementById('chatBotPanel');
     this.isOpen=!this.isOpen;
     p.style.display=this.isOpen?'flex':'none';
     if(this.isOpen)setTimeout(()=>document.getElementById('chatInput')?.focus(),100);
   },
-  // Краткая сводка материалов: name (type, max_width), цена
-  _matSummary(lang){
+  _matPriceStr(m, mult){
+    if(m.type==='pvc_dynamic'){
+      const base = (m.price||3) * mult;
+      return 'storis_mm * '+base.toFixed(2)+' EUR/m2';
+    }
+    if(m.type==='acrylic' || m.id==='acrylic'){
+      const base = (m.price||14) * mult;
+      return 'storis_mm * '+base.toFixed(2)+' EUR/m2';
+    }
+    if(m.price!=null) return (m.price*mult).toFixed(2)+' EUR/m2';
+    if(m.price40!=null) return '4+0:'+(m.price40*mult).toFixed(2)+', 4+4:'+(m.price44*mult).toFixed(2)+' EUR/m2';
+    return '-';
+  },
+  _matSummary(lang, mult){
     const lines=[];
     try{
       Object.entries(Config.materials).forEach(([c,items])=>{
         items.forEach(m=>{
           const nm=typeof m.name==='object'?(m.name[lang]||m.name.lt):m.name;
-          let pr;
-          if(m.type==='pvc_dynamic') pr='storis x 3 EUR/m2';
-          else if(m.type==='acrylic') pr='storis x 14 EUR/m2';
-          else if(m.price!=null) pr=m.price+' EUR/m2';
-          else if(m.price40!=null) pr='4+0:'+m.price40+', 4+4:'+m.price44+' EUR/m2';
-          else pr='-';
-          const mw=m.maxWidth?(' [rulonas iki '+m.maxWidth+'mm]'):'';
+          const pr=this._matPriceStr(m, mult);
+          const mw=m.maxWidth?(' | rulonas iki '+m.maxWidth+'mm'):'';
           const allowed=Config.allowedServices[m.id]||[];
           const allowStr=allowed.length?' | paslaugos: '+allowed.join(','):'';
-          lines.push('- ['+c+'] '+nm+' ('+m.id+'): '+pr+mw+allowStr);
+          const tp=m.type?(' ['+m.type+']'):'';
+          lines.push('• '+m.id+tp+' "'+nm+'" cat='+c+': '+pr+mw+allowStr);
         });
       });
     }catch(e){}
     return lines.join('\n');
   },
-  _svcSummary(lang){
+  _svcSummary(lang, mult){
     const lines=[];
     try{
       Config.servicesList.forEach(s=>{
         const nm=typeof s.name==='object'?(s.name[lang]||s.name.lt):s.name;
         let rt;
-        if(s.pricePerM!=null) rt=s.pricePerM+' EUR/m';
-        else if(s.pricePerM2!=null) rt=s.pricePerM2+' EUR/m2';
-        else rt=(s.price||0)+' EUR';
-        lines.push('- '+nm+' ('+s.id+'): '+rt);
+        if(s.pricePerM!=null) rt=(s.pricePerM*mult).toFixed(2)+' EUR/m';
+        else if(s.pricePerM2!=null) rt=(s.pricePerM2*mult).toFixed(2)+' EUR/m2';
+        else rt=((s.price||0)*mult).toFixed(2)+' EUR';
+        lines.push('• '+s.id+' "'+nm+'": '+rt);
       });
     }catch(e){}
     return lines.join('\n');
   },
-  getSystemPrompt(){
-    const lang=CalcApp?.currentLang||'lt';
-    const mats=this._matSummary(lang);
-    const svcs=this._svcSummary(lang);
-    const isClient = CalcApp?.userRole==='client';
+  _staticKnowledge(){
+    return `PRINT IN ASISTENTAS - lietuviška placiaformato spaudos imone.
+
+================== ELGESYS ==================
+• Atsakyk kalba, kuria klientas raso: LT, EN arba RU (detektuok automatiškai is paskutinio kliento zinutes).
+• LABAI TRUMPAS, mandagus, profesionalus. Tik tai, ko klausia.
+• JOKIO markdown: be **bold**, be lentelių |---|, be #.
+• NIEKADA neaprasyk skaiciavimo eigos: rodyk tik galutinį rezultatą.
+• Jei trūksta info (dydis/medziaga/kiekis/spauda) - paklausk TIK to, ko trūksta.
+• Kai turi visus duomenis - VISADA naudok fill_calculator tool. Kalkuliatorius pats apskaičiuos tikrąją kainą.
+
+================== ŽINIOS APIE SPAUDĄ ==================
+SPAUDOS TIPAI:
+• ECO-SOLVENT: laukui (banneriai, mesh, plėvelės). Pigiausia. Reikia dziuvimo laiko.
+• LATEX (HP) = UV pas mus (tas pats procesas, ta pati kaina): patalpoms (plėvelės, drobės, popierius). Bekvape, eko, greitai dziusta.
+• UV (LED Mimaki, Roland): kietoms (PVC, akrilas, stiklas, mediena, alu). Iskart dziusta, ypatingai patvari.
+• SUBLIMACIJA: tekstilei (veliavos, audiniai). Po termo presavimo - ryskios spalvos, nesilupa.
+
+MEDZIAGU PRITAIKYMAS:
+• Tentas 500g - laukui, baneriai, ilgalaikis
+• Mesh - vejui pralaidus, fasadai
+• Blockout - dvipusis (nepersisviecia)
+• Backlit - lightbox, fonas su apsvietimu iš nugaros
+• Roll-up - parodu stendai
+• Lipni plėvelė self - stiklai, sienos, dekoras
+• Auto plėvelė 2D - automobiliai (REIKIA laminuoti)
+• Perforuota - vitrinos langams
+• Drobė - paveikslai (su porėmiu arba be)
+• Akrilas (organinis stiklas) - lentelės, prizai. Tipai: clear/white_opaque/milk_white.
+• Aliuminio kompozitas - lauko lentelės, fasadai
+• Braižytas alu - prestige lentelės (sidabras/auksas)
+• Stadur 10mm, Priplak, Magnetas 0.8mm
+• Kartonas 3mm gofras - upakavimas
+• Mikrogofras 1.5mm - Baltas/Baltas arba Rudas/Rudas
+• Swedboard 10/16mm - kietas korėtas
+• Serimat 1.25/2mm - plonas
+• Invercote 240/300/350gsm - kokybiškas
+
+DVIPUSĖ SPAUDA (price40=vienpuse, price44=dvipuse):
+Liečia: blockout, backlight_tent, sub_block360. PRIVALOMA paklausti kliento.
+
+KIETOMS (rigid/kartonas) UV SPAUDA - priedai per m2:
+• CMYK 4+0: +10 EUR
+• CMYK 4+4: +20 EUR
+• CMYK+W 5+0: +18 EUR
+• CMYK+W 5+5: +36 EUR
+EXTRAS (galima derinti):
+• Neono: +10 EUR/m2
+• Balta: +10 EUR/m2
+• Brailio: +100 EUR/m2
+• Lakas: +10 EUR/m2
+
+PVC dinamiska = storis_mm × base_kaina EUR/m2 (zr. medziagu sarase).
+Akrilas = storis_mm × base_kaina EUR/m2. Storiai: 2,3,4,5,6,10 mm.
+
+CNC FREZAVIMAS:
+• Storis ≤ 3mm: 1.00 EUR/m
+• Storis ≤ 5mm: 1.50 EUR/m
+• Storis > 5mm: 2.00 EUR/m
+
+LAMINAVIMAS priedas/m2 (vinyl plėvelėms):
+• Ekonominis: +2 EUR/m2
+• 2D Auto: +5 EUR/m2
+• 3D Auto: +10 EUR/m2
+• Grindų neslidus: +8 EUR/m2
+Auto plėvelė (film_auto) - laminuoti BŪTINA.
+
+PJOVIMAS:
+• Peiliu (perimetro): 0.40 EUR/m
+• CNC: dinamiška kaina (žiūr. virš)
+• Kartonui (corrugated_3mm, micro_1_5): area=3.50/m2 ARBA linear=0.40/m
+• Swedboard, Stadur: 0.50 EUR/m
+
+RULONO PLOTIS - jei OBA matmenys > rulono pločio (zr. medziagos):
+• Tekstilė → siuvimas (services: sewing)
+• Tentai (vinyl) → litavimas/welding (services: welding)
+Jei vienas matmuo ≤ rulono pločio → OK, jungti nereikia.
+
+MIN UZSAKYMAS galioja jei suma < min. Tuomet rodom min ir paminim.
+
+VARTOTOJO REŽIMAI:
+• VADYBININKAS / ADMIN - mato savikaina (be antkainio)
+• KLIENTAS - mato kainas su +25% antkainiu (jau pridėta žemiau esancioms kainoms - NEMULTIPLINK papildomai!)`;
+  },
+  _dynamicContext(){
+    const isClient = CalcApp?.userRole === 'client';
     const markup = isClient ? (Config?.clientMarkup||1.25) : 1.0;
-    const mo = (isClient?Config?.minOrderClient:Config?.minOrderManager) || (isClient?20:15);
-    return `Tu esi Print In - placiaformato spaudos imones asistentas Lietuvoje. Atsakyk kalba kuria klientas raso (LT/EN/RU).
+    const mo = (isClient ? Config?.minOrderClient : Config?.minOrderManager) || (isClient?20:15);
+    const lang = CalcApp?.currentLang||'lt';
+    const role = isClient ? 'KLIENTAS' : (CalcApp?.userRole==='admin'?'ADMINISTRATORIUS':'VADYBININKAS');
+    const markupTxt = isClient
+      ? `KLIENTO REZIMAS: visos žemiau kainos JAU su +${Math.round((markup-1)*100)}% antkainiu.`
+      : `VADYBININKO/ADMIN REZIMAS: kainos = savikaina (be antkainio).`;
+    return `================== DABARTINIS KONTEKSTAS ==================
+VARTOTOJAS: ${role}
+${markupTxt}
+MIN. UZSAKYMAS: ${mo} EUR be PVM.
+PVM: 21%.
+UI KALBA: ${lang.toUpperCase()}.
 
-ELGESYS:
-- LABAI TRUMPAS, mandagus, profesionalus
-- Tik tai ko klausia. JOKIO papildomo paaiskinimo.
-- JOKIU markdown: be **bold**, be lenteliu |---|, be #
-- Skaiciavima rodyk TIK galutiniu rezultatu - NIEKADA neaprasyk kaip skaiciavai.
+================== MEDZIAGOS (kainos tinkamos siam vartotojui) ==================
+${this._matSummary(lang, markup)}
 
-FORMATAS atsakymo apie kaina:
-"1 vnt = X.XX EUR be PVM
-N vnt = Y.YY EUR be PVM (Z.ZZ EUR su PVM 21%)"
-Jei suma < min uzsakymo (${mo} EUR) - taikom min ${mo} EUR ir paminek.
-
-NIEKADA nerodyk:
-- Detalaus suskirstymo (medziaga + spauda + pjovimas + ...)
-- Formules (w*h/1e6)
-- Kainu uz m2 nebent klientas paklause "kokia kaina m2"
-
-SPAUDOS TIPAI (kada kuri rekomenduoti):
-- ECO-SOLVENT: laukui (banneriai, mesh, plėvelės), pigiausia, ilgas dziuvimas
-- LATEX (HP): patalpoms (apmusalai, plėvelės, drobės), bekvape, eko, greitai dziusta
-- UV (Mimaki, Roland): kietoms medziagoms (PVC, acrylic, stiklas, mediena), iskart dziusta, ypac patvari
-- SUBLIMACIJA: tekstilei (veliavos, audiniai), ryskios spalvos po termo presavimo
-
-MEDZIAGOS PRITAIKYMAS:
-- Tentas 500g - laukui, baneriai, ilgalaikis
-- Mesh - vejui pralaidus, fasadai
-- Blockout - dvipusis baneriai, neperziurimas
-- Backlit (tentas/audinys/plėvelė) - lightbox, foninis apsvietimas
-- Roll-up - stendai, parodos
-- Lipni plėvelė (self) - stiklai, sienos, dekoras
-- Auto plėvelė (2D) - automobiliai (laminuoti butina)
-- Drobė - paveikslai, interjeras
-- Akrilas - lentelės, prizai, prestige
-- Aliuminis - fasadai, lauko lenteles, ilgalaikis
-- Kartonas - upakavimas, POS, vienkartiniai
-- Mikrogofras - lengvas, vidaus dekoras
-
-VARTOTOJAS: ${isClient?'KLIENTAS (kainos jau su +'+Math.round((markup-1)*100)+'% antkainiu)':'VADYBININKAS (savikaina)'}.
-Minimalus uzsakymas: ${mo} EUR be PVM. PVM 21%.
-
-SKAICIAVIMO FORMULE (NESAKYK klientui, tik tau):
-Plotas(m2) = plotis_mm * aukstis_mm / 1000000
-Perimetras(m) = (plotis_mm + aukstis_mm) * 2 / 1000
-UV priedas/m2: 4+0=+10, 4+4=+20, 5+0(CMYK+W)=+18, 5+5=+36
-UV extras: Neon=+10, Balta=+10, Brailio=+100, Lakas=+10
-CNC frezavimas dinamiskas: <=3mm=1, <=5mm=1.5, >5mm=2 EUR/m
-Visos kainos zemiau JAU su antkainiu jei klientas. Galutine kaina = (medziaga + spauda + paslaugos) * plotas + perimetro paslaugos.
-
-MEDZIAGOS:
-${mats}
-
-PASLAUGOS:
-${svcs}
-
-PATARIMAI klientui:
-Jei klausia "kas tinka X" - rekomenduok 1-2 medziagas, trumpai (1 sakinys kodel).
-Jei klausia "kokia kaina" - paimk dydi/kieki, paskaiciuok, pateik galutine kaina ${isClient?'(klientui)':''}.
-Jei truksta info - paklausk TIK to ko truksta (dydis? medziaga? kiekis?).
-AUTOFILL: Kai turi VISUS duomenis - pridek [[FILL:{...}]] JSON zyme kiekvienam gaminiui.
-FILL JSON laukai: material(id), width(mm), height(mm), qty, pvcThickness, acrylicType, acrylicThickness, rigidPrint(0/10/20/18/36), uvService(0/10/20/18/36), printType(4+0/4+4), services([cutting/milling/plotting/lamination]), laminateType(0/2/5/10/8), rigidBraille(true), rigidWhite(true), rigidNeon(true).
-Pvz: [[FILL:{"material":"paper_satin","width":594,"height":841,"qty":150}]]
-Pries [[FILL:]] para trumpa teksta su kaina. Po visu FILL - klausk: "Ar prideti i samata?"
-UV=LATEX: "Latex" ir "UV" spauda - tas pats procesas, tos pacios kainos.
-LAMINAVIMAS priedas/m2: Ekonominis=+2, 2D Auto=+5, 3D Auto=+10, Grindų neslidus=+8. Auto plėvelė - laminuoti būtina.
-ORGANINIS STIKLAS kaina: storis_mm x 14 EUR/m2 (3mm=42, 5mm=70, 6mm=84, 10mm=140). Tipai: skaidrus(clear), baltas(white_opaque), pieno(milk_white). Storiai: 2,3,4,5,6,10mm.
-RIGID UV SPAUDA taikoma: PVC, acrylic, alu kompozitas, stadur, priplak. Priedai/m2: CMYK 4+0=+10, 4+4=+20, CMYK+W 5+0=+18, 5+5=+36. Extras: Neon/Balta/Lakas=+10, Brailio=+100.
-DVIPUSĖ MEDZIAGOS (blockout,backlit,sub_block360): klientui reikia paklausti - vienpusė (price40) ar dvipusė (price44) spauda?
-MAKS PLOTIS: Tentas 500g=5.1m, Blockout=3.2m, Mesh=5m, Backlit=5m, Blockout audinys=3.15m, Banner audinys=3.2m, Taftas=1.5m.`;
+================== PASLAUGOS ==================
+${this._svcSummary(lang, markup)}`;
+  },
+  _tools(){
+    return [{
+      name: 'fill_calculator',
+      description: 'Uzpildo skaiciuokles forma su gaminio duomenimis. Naudok kai turi VISUS duomenis kainai apskaiciuoti. Galima saukti kelis kartus (po viena gaminiui). Kalkuliatorius pats apskaicius tikra kaina.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          material: { type: 'string', description: 'Medziagos id (pvz: tentas_500, paper_satin, acrylic, pvc_3_19).' },
+          width: { type: 'integer', description: 'Plotis MM (ne metrai, ne cm). Pvz 2000=2m.' },
+          height: { type: 'integer', description: 'Aukstis MM.' },
+          qty: { type: 'integer', description: 'Kiekis vnt (default 1).', default: 1 },
+          printType: { type: 'string', enum: ['4+0','4+4'], description: 'Spaudos tipas dual medziagoms (blockout, backlight_tent, sub_block360).' },
+          pvcThickness: { type: 'integer', description: 'PVC storis mm (1-19) - tik jei material=pvc_3_19.' },
+          acrylicType: { type: 'string', enum: ['clear','white_opaque','milk_white'], description: 'Akrilo tipas - tik jei material=acrylic.' },
+          acrylicThickness: { type: 'integer', enum: [2,3,4,5,6,10], description: 'Akrilo storis mm.' },
+          rigidPrint: { type: 'integer', enum: [0,10,20,18,36], description: 'UV spauda kietoms ir kartonui: 0=be, 10=CMYK 4+0, 20=CMYK 4+4, 18=CMYK+W 5+0, 36=CMYK+W 5+5.' },
+          rigidNeon: { type: 'boolean' }, rigidWhite: { type: 'boolean' }, rigidBraille: { type: 'boolean' }, rigidVarnish: { type: 'boolean' },
+          uvService: { type: 'integer', enum: [0,10,20,18,36], description: 'UV/Latex spauda paslaugoms (uv_latex, film_uv).' },
+          uvNeon: { type: 'boolean' }, uvWhite: { type: 'boolean' }, uvBraille: { type: 'boolean' }, uvVarnish: { type: 'boolean' },
+          filmMatt: { type: 'boolean', description: 'Matinis pavirsius (film_self/film_auto/film_backlight).' },
+          filmGloss: { type: 'boolean' },
+          filmUvSkaidri: { type: 'boolean' }, filmUvBalta: { type: 'boolean' }, filmUvMatt: { type: 'boolean' }, filmUvGloss: { type: 'boolean' },
+          block280Black: { type: 'boolean', description: 'Blockout 280 - nugarine puse juoda.' },
+          aluSilver: { type: 'boolean' }, aluGold: { type: 'boolean' },
+          microBaltas: { type: 'boolean' }, microRudas: { type: 'boolean' },
+          swed10: { type: 'boolean' }, swed16: { type: 'boolean' },
+          serimat125: { type: 'boolean' }, serimat200: { type: 'boolean' },
+          inv240: { type: 'boolean' }, inv300: { type: 'boolean' }, inv350: { type: 'boolean' },
+          flagReklamine: { type: 'boolean', description: 'Reklamines veliavos (14 EUR/m2) - tik sub_flag.' },
+          rollupMontav: { type: 'boolean', description: 'Roll-up montavimas (+4 EUR).' },
+          services: { type: 'array', items: { type: 'string', enum: ['cutting','milling','grommets','plotting','lamination','silicone_edge','sewing','welding','calendering_addon'] }, description: 'Pasirinktos paslaugos masyvas.' },
+          laminateType: { type: 'integer', enum: [0,2,5,10,8], description: 'Laminato tipas (jei lamination in services): 0=nera, 2=ekon, 5=2D, 10=3D, 8=Grindu neslidus.' },
+          lamMatt: { type: 'boolean' }, lamGloss: { type: 'boolean' },
+          millingThickness: { type: 'integer', enum: [2,3,4,5,6,10], description: 'CNC frezavimo storis (mm).' },
+          cuttingMethod: { type: 'string', enum: ['none','area','linear'], description: 'Kartono pjovimo metodas.' },
+          linearCutLength: { type: 'integer', description: 'Pjovimo ilgis MM (jei cuttingMethod=linear).' },
+          weldingLength: { type: 'integer', description: 'Litavimo ilgis MM.' },
+          sewingLength: { type: 'integer', description: 'Siuvimo ilgis MM (0=perimetras).' }
+        },
+        required: ['material','width','height']
+      }
+    }];
   },
   fillCalculator(p){
     try{
@@ -2142,62 +2230,92 @@ MAKS PLOTIS: Tentas 500g=5.1m, Blockout=3.2m, Mesh=5m, Backlit=5m, Blockout audi
       if(catEl){catEl.value=cat;CalcApp.updateMaterials();}
       const matEl=document.getElementById('material');
       if(matEl){matEl.value=p.material;CalcApp.updateMaterialOptions();}
-      const sv=(id,v)=>{const e=document.getElementById(id);if(e&&v!=null)e.value=String(v);};
+      const sv=(id,v)=>{const e=document.getElementById(id);if(e&&v!=null&&v!=='')e.value=String(v);};
+      const cb=(id,v)=>{const e=document.getElementById(id);if(e)e.checked=v===true;};
       sv('width',p.width);sv('height',p.height);sv('quantity',p.qty||1);
-      sv('pvcThickness',p.pvcThickness);
-      sv('acrylicType',p.acrylicType);sv('acrylicThickness',p.acrylicThickness);
-      if(p.rigidPrint!=null)sv('rigidPrint',p.rigidPrint);
-      if(p.uvService!=null)sv('uvServicePrintType',p.uvService);
       sv('printType',p.printType);
-      if(p.laminateType!=null)sv('laminateType',p.laminateType);
+      sv('pvcThickness',p.pvcThickness);
+      sv('acrylicType',p.acrylicType);
+      sv('acrylicThickness',p.acrylicThickness);
+      if(p.rigidPrint!=null)sv('rigidPrint',p.rigidPrint);
+      cb('rigidNeon',p.rigidNeon);cb('rigidWhite',p.rigidWhite);cb('rigidBraille',p.rigidBraille);cb('rigidVarnish',p.rigidVarnish);
+      if(p.uvService!=null)sv('uvServicePrintType',p.uvService);
+      cb('uvNeon',p.uvNeon);cb('uvWhite',p.uvWhite);cb('uvBraille',p.uvBraille);cb('uvVarnish',p.uvVarnish);
+      cb('filmMatt',p.filmMatt);cb('filmGloss',p.filmGloss);
+      cb('filmUvSkaidri',p.filmUvSkaidri);cb('filmUvBalta',p.filmUvBalta);cb('filmUvMatt',p.filmUvMatt);cb('filmUvGloss',p.filmUvGloss);
+      cb('block280Black',p.block280Black);
+      cb('aluSilver',p.aluSilver);cb('aluGold',p.aluGold);
+      cb('microBaltas',p.microBaltas);cb('microRudas',p.microRudas);
+      cb('swed10',p.swed10);cb('swed16',p.swed16);
+      cb('serimat125',p.serimat125);cb('serimat200',p.serimat200);
+      cb('inv240',p.inv240);cb('inv300',p.inv300);cb('inv350',p.inv350);
+      cb('flagReklamine',p.flagReklamine);
+      cb('rollupMontav',p.rollupMontav);
+      if(p.cuttingMethod){sv('cuttingMethod',p.cuttingMethod);CalcApp.checkLinearCutWrap?.();}
+      if(p.linearCutLength!=null)sv('linearCutLength',p.linearCutLength);
+      if(p.weldingLength!=null)sv('weldingLength',p.weldingLength);
+      if(p.sewingLength!=null)sv('sewingLength',p.sewingLength);
       sv('millingThickness',p.millingThickness);
-      ['rigidNeon','rigidWhite','rigidBraille','rigidVarnish',
-       'uvNeon','uvWhite','uvBraille','uvVarnish'].forEach(id=>{
-        const e=document.getElementById(id);if(e)e.checked=p[id]===true;
-      });
-      document.querySelectorAll('#servicesList input[type=checkbox]').forEach(e=>e.checked=false);
-      CalcApp.updateServices();
-      if(p.services&&p.services.length){
-        p.services.forEach(svc=>{
-          const e=document.querySelector('#servicesList input[value="'+svc+'"]');
-          if(e)e.checked=true;
-        });
+      if(p.laminateType!=null)sv('laminateType',p.laminateType);
+      cb('lamMatt',p.lamMatt);cb('lamGloss',p.lamGloss);
+      // FIX: правильный селектор #services (а не #servicesList)
+      const sList=document.getElementById('services');
+      if(sList){
+        sList.querySelectorAll('input[type=checkbox]').forEach(e=>e.checked=false);
+        if(p.services&&p.services.length){
+          p.services.forEach(svc=>{
+            const e=sList.querySelector('input[value="'+svc+'"]');
+            if(e)e.checked=true;
+          });
+        }
       }
+      CalcApp.checkLamWrap?.();
+      CalcApp.checkWeldingWrap?.();
+      CalcApp.checkSewingWrap?.();
+      CalcApp.checkMillingWrap?.();
       CalcApp.updateLivePreview();
       return true;
     }catch(e){console.error('fillCalculator:',e);return false;}
   },
-  parseFills(t){
-    const rx=/\[\[FILL:([\s\S]*?)\]\]/g;
-    const f=[];let m;
-    while((m=rx.exec(t))!==null){try{f.push(JSON.parse(m[1]));}catch(e){console.warn('FILL parse err',e);}}
-    return f;
-  },
-  stripFills(t){return t.replace(/\[\[FILL:[\s\S]*?\]\]/g,'').trim();},
-  async processFills(fills){
+  async processToolUses(toolUses){
     const res=[];
-    for(const p of fills){
-      const ok=this.fillCalculator(p);
-      if(ok){const it=CalcApp.calculateItem();if(it)res.push({it,p});}
+    for(const tu of toolUses){
+      if(tu.name!=='fill_calculator') continue;
+      const p = tu.input;
+      const ok = this.fillCalculator(p);
+      if(ok){
+        const it = CalcApp.calculateItem();
+        if(it) res.push({it, p, tool_use_id: tu.id});
+      }
     }
-    if(!res.length)return;
+    if(!res.length) return;
     const msgs=document.getElementById('chatMessages');
     const d=document.createElement('div');
     d.style.cssText='background:#0f172a;border-radius:10px;padding:10px 12px;font-size:12px;color:#e2e8f0;border:1px solid rgba(99,102,241,.3);max-width:95%;';
-    const total=res.reduce((s,r)=>s+r.it.rawTotal,0);
-    const mo=(CalcApp.userRole==='client'?Config.minOrderClient:Config.minOrderManager)||15;
-    const ft=Utils.roundTo5(Math.max(total,mo));
-    let html='<div style="color:#a78bfa;font-weight:600;margin-bottom:6px;">Apskai\u010diuota:</div>';
+    const mult = CalcApp.priceMultiplier || 1;
+    const totalRaw = res.reduce((s,r)=>s+r.it.rawTotal,0);
+    const totalDisplay = totalRaw * mult;
+    const isClient = CalcApp.userRole==='client';
+    const mo = (isClient?Config.minOrderClient:Config.minOrderManager) || (isClient?20:15);
+    const ft = Math.max(Utils.roundTo5(totalDisplay), mo);
+    const isMin = totalDisplay < mo;
+    let html='<div style="color:#a78bfa;font-weight:600;margin-bottom:6px;">📋 Apskaičiuota:</div>';
     res.forEach(({it})=>{
-      html+='<div style="margin-bottom:2px;">'+it.material+' '+it.dimensions+' \xd7'+it.qty+' = <b>'+it.rawTotal.toFixed(2)+' EUR</b></div>';
+      const itemDisplay = it.rawTotal * mult;
+      const perUnit = it.qty>0 ? (itemDisplay/it.qty).toFixed(2) : '0.00';
+      html+='<div style="margin-bottom:4px;">'+escHtml(it.material)+' '+escHtml(it.dimensions)+' ×'+it.qty+' = <b>'+itemDisplay.toFixed(2)+' EUR</b> <span style="color:#94a3b8;">('+perUnit+'/vnt)</span></div>';
     });
-    if(res.length>1)html+='<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(148,163,184,.2);"><b>Viso: '+ft.toFixed(2)+' EUR</b> be PVM ('+Utils.round(ft*1.21,2).toFixed(2)+' su PVM)</div>';
-    html+='<div style="margin-top:8px;display:flex;gap:8px;">';
-    html+='<button onclick="ChatBot.confirmAdd()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:600;">Prid\u0117ti \u012f s\u0105mat\u0105 \u2713</button>';
-    html+='<button onclick="ChatBot.cancelAdd()" style="background:#334155;color:#94a3b8;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:11px;">Ne, at\u0161aukti</button>';
+    html+='<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.2);"><b>Viso: '+ft.toFixed(2)+' EUR</b> be PVM (<b>'+Utils.round(ft*1.21,2).toFixed(2)+' EUR</b> su PVM 21%)';
+    if(isMin) html+=' <span style="color:#fbbf24;">⚠ taikomas min. '+mo+' EUR</span>';
     html+='</div>';
-    d.innerHTML=html;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
-    this._pendingFills=fills;
+    html+='<div style="margin-top:8px;display:flex;gap:8px;">';
+    html+='<button onclick="ChatBot.confirmAdd()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:600;">Pridėti į sąmatą ✓</button>';
+    html+='<button onclick="ChatBot.cancelAdd()" style="background:#334155;color:#94a3b8;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:11px;">Ne, atšaukti</button>';
+    html+='</div>';
+    d.innerHTML=html;
+    msgs.appendChild(d);
+    msgs.scrollTop=msgs.scrollHeight;
+    this._pendingFills = res.map(r=>r.p);
   },
   confirmAdd(){
     if(!this._pendingFills)return;
@@ -2206,7 +2324,7 @@ MAKS PLOTIS: Tentas 500g=5.1m, Blockout=3.2m, Mesh=5m, Backlit=5m, Blockout audi
     this._pendingFills=null;
     const d=document.createElement('div');
     d.style.cssText='background:#064e3b;border-radius:8px;padding:8px 12px;font-size:12px;color:#6ee7b7;max-width:92%;';
-    d.textContent='Prid\u0117ta '+added+' poz. \u012f Galutin\u0119 s\u0105mat\u0105! \u2705';
+    d.textContent='✅ Pridėta '+added+' poz. į galutinę sąmatą';
     document.getElementById('chatMessages').appendChild(d);
     document.getElementById('chatMessages').scrollTop=9999;
   },
@@ -2221,18 +2339,22 @@ MAKS PLOTIS: Tentas 500g=5.1m, Blockout=3.2m, Mesh=5m, Backlit=5m, Blockout audi
   addMsg(t,r){
     const m=document.getElementById('chatMessages');
     const d=document.createElement('div');
-    const fills=r!=='user'?this.parseFills(t):[];
-    const txt=fills.length>0?this.stripFills(t):t;
     d.style.cssText=r==='user'
       ?'background:#7c3aed;border-radius:10px 10px 2px 10px;padding:9px 12px;font-size:12px;color:white;align-self:flex-end;max-width:85%;word-break:break-word;'
       :'background:#0f172a;border-radius:10px 10px 10px 2px;padding:9px 12px;font-size:12px;color:#e2e8f0;border:1px solid rgba(148,163,184,.1);max-width:92%;white-space:pre-wrap;word-break:break-word;';
-    d.textContent=txt;
-    if(txt)m.appendChild(d);
+    d.textContent=t;
+    if(t)m.appendChild(d);
     m.scrollTop=m.scrollHeight;
-    if(fills.length>0){setTimeout(()=>this.processFills(fills),400);}
     return d;
   },
-
+  _trimHistory(){
+    if(this.history.length > this.MAX_HISTORY){
+      this.history = this.history.slice(-this.MAX_HISTORY);
+      while(this.history.length && this.history[0].role!=='user'){
+        this.history.shift();
+      }
+    }
+  },
   async send(){
     const inp=document.getElementById('chatInput');
     const txt=inp?.value.trim();
@@ -2240,42 +2362,58 @@ MAKS PLOTIS: Tentas 500g=5.1m, Blockout=3.2m, Mesh=5m, Backlit=5m, Blockout audi
     inp.value='';
     this.addMsg(txt,'user');
     this.history.push({role:'user',content:txt});
+    this._trimHistory();
     this.isLoading=true;
     const ld=this.addMsg('⏳','bot');
     try{
-      // Запрос идёт через Supabase Edge Function chat-proxy (API ключ скрыт)
+      const systemBlocks = [
+        { type:'text', text: this._staticKnowledge(), cache_control: {type:'ephemeral'} },
+        { type:'text', text: this._dynamicContext() }
+      ];
       const res=await fetch(SB_URL+'/functions/v1/chat-proxy',{
         method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'Authorization':'Bearer '+SB_KEY,
-          'apikey':SB_KEY,
-        },
+        headers:{ 'Content-Type':'application/json' },
         body:JSON.stringify({
-          model:'claude-haiku-4-5-20251001',
-          max_tokens:1024,
-          system:this.getSystemPrompt(),
-          messages:this.history
+          model: this.MODEL,
+          max_tokens: 1500,
+          system: systemBlocks,
+          tools: this._tools(),
+          messages: this.history
         })
       });
       const data=await res.json();
       if(data.error){
-        ld.textContent='Klaida: '+(typeof data.error==='string'?data.error:JSON.stringify(data.error));
+        ld.textContent='⚠ Klaida: '+(typeof data.error==='string'?data.error:JSON.stringify(data.error));
         return;
       }
-      const reply=data.content?.[0]?.text||'Klaida: tuscias atsakymas.';
       ld.remove();
-      this.addMsg(reply,'bot');
-      this.history.push({role:'assistant',content:reply});
+      const content = data.content || [];
+      let textReply = '';
+      const toolUses = [];
+      for(const blk of content){
+        if(blk.type==='text') textReply += blk.text;
+        else if(blk.type==='tool_use') toolUses.push(blk);
+      }
+      if(textReply.trim()) this.addMsg(textReply.trim(),'bot');
+      this.history.push({role:'assistant', content: content});
+      if(toolUses.length>0){
+        await this.processToolUses(toolUses);
+        const toolResults = toolUses.map(tu=>({
+          type:'tool_result',
+          tool_use_id: tu.id,
+          content: 'Sėkmingai užpildyta. Kaina parodyta vartotojui.'
+        }));
+        this.history.push({role:'user', content: toolResults});
+        this._trimHistory();
+      }
     }catch(e){
-      ld.textContent='Klaida: '+e.message;
+      ld.textContent='⚠ Klaida: '+e.message;
       console.error('Bot error:',e);
     }finally{
       this.isLoading=false;
     }
   }
 };
-
 window.addEventListener('load', () => {
   CalcApp.init();
   AdminPanel.loadFromSupabase().then(() => {
