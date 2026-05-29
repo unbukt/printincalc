@@ -2120,6 +2120,10 @@ PATARIMAI klientui:
 Jei klausia "kas tinka X" - rekomenduok 1-2 medziagas, trumpai (1 sakinys kodel).
 Jei klausia "kokia kaina" - paimk dydi/kieki, paskaiciuok, pateik galutine kaina ${isClient?'(klientui)':''}.
 Jei truksta info - paklausk TIK to ko truksta (dydis? medziaga? kiekis?).
+AUTOFILL: Kai turi VISUS duomenis - pridek [[FILL:{...}]] JSON zyme kiekvienam gaminiui.
+FILL JSON laukai: material(id), width(mm), height(mm), qty, pvcThickness, acrylicType, acrylicThickness, rigidPrint(0/10/20/18/36), uvService(0/10/20/18/36), printType(4+0/4+4), services([cutting/milling/plotting/lamination]), laminateType(0/2/5/10/8), rigidBraille(true), rigidWhite(true), rigidNeon(true).
+Pvz: [[FILL:{"material":"paper_satin","width":594,"height":841,"qty":150}]]
+Pries [[FILL:]] para trumpa teksta su kaina. Po visu FILL - klausk: "Ar prideti i samata?"
 UV=LATEX: "Latex" ir "UV" spauda - tas pats procesas, tos pacios kainos.
 LAMINAVIMAS priedas/m2: Ekonominis=+2, 2D Auto=+5, 3D Auto=+10, Grindų neslidus=+8. Auto plėvelė - laminuoti būtina.
 ORGANINIS STIKLAS kaina: storis_mm x 14 EUR/m2 (3mm=42, 5mm=70, 6mm=84, 10mm=140). Tipai: skaidrus(clear), baltas(white_opaque), pieno(milk_white). Storiai: 2,3,4,5,6,10mm.
@@ -2127,17 +2131,108 @@ RIGID UV SPAUDA taikoma: PVC, acrylic, alu kompozitas, stadur, priplak. Priedai/
 DVIPUSĖ MEDZIAGOS (blockout,backlit,sub_block360): klientui reikia paklausti - vienpusė (price40) ar dvipusė (price44) spauda?
 MAKS PLOTIS: Tentas 500g=5.1m, Blockout=3.2m, Mesh=5m, Backlit=5m, Blockout audinys=3.15m, Banner audinys=3.2m, Taftas=1.5m.`;
   },
+  fillCalculator(p){
+    try{
+      let cat=null;
+      for(const [c,items] of Object.entries(Config.materials)){
+        if(items.find(m=>m.id===p.material)){cat=c;break;}
+      }
+      if(!cat){console.warn('Bot: material not found:',p.material);return false;}
+      const catEl=document.getElementById('category');
+      if(catEl){catEl.value=cat;CalcApp.updateMaterials();}
+      const matEl=document.getElementById('material');
+      if(matEl){matEl.value=p.material;CalcApp.updateMaterialOptions();}
+      const sv=(id,v)=>{const e=document.getElementById(id);if(e&&v!=null)e.value=String(v);};
+      sv('width',p.width);sv('height',p.height);sv('quantity',p.qty||1);
+      sv('pvcThickness',p.pvcThickness);
+      sv('acrylicType',p.acrylicType);sv('acrylicThickness',p.acrylicThickness);
+      if(p.rigidPrint!=null)sv('rigidPrint',p.rigidPrint);
+      if(p.uvService!=null)sv('uvServicePrintType',p.uvService);
+      sv('printType',p.printType);
+      if(p.laminateType!=null)sv('laminateType',p.laminateType);
+      sv('millingThickness',p.millingThickness);
+      ['rigidNeon','rigidWhite','rigidBraille','rigidVarnish',
+       'uvNeon','uvWhite','uvBraille','uvVarnish'].forEach(id=>{
+        const e=document.getElementById(id);if(e)e.checked=p[id]===true;
+      });
+      document.querySelectorAll('#servicesList input[type=checkbox]').forEach(e=>e.checked=false);
+      CalcApp.updateServices();
+      if(p.services&&p.services.length){
+        p.services.forEach(svc=>{
+          const e=document.querySelector('#servicesList input[value="'+svc+'"]');
+          if(e)e.checked=true;
+        });
+      }
+      CalcApp.updateLivePreview();
+      return true;
+    }catch(e){console.error('fillCalculator:',e);return false;}
+  },
+  parseFills(t){
+    const rx=/\[\[FILL:([\s\S]*?)\]\]/g;
+    const f=[];let m;
+    while((m=rx.exec(t))!==null){try{f.push(JSON.parse(m[1]));}catch(e){console.warn('FILL parse err',e);}}
+    return f;
+  },
+  stripFills(t){return t.replace(/\[\[FILL:[\s\S]*?\]\]/g,'').trim();},
+  async processFills(fills){
+    const res=[];
+    for(const p of fills){
+      const ok=this.fillCalculator(p);
+      if(ok){const it=CalcApp.calculateItem();if(it)res.push({it,p});}
+    }
+    if(!res.length)return;
+    const msgs=document.getElementById('chatMessages');
+    const d=document.createElement('div');
+    d.style.cssText='background:#0f172a;border-radius:10px;padding:10px 12px;font-size:12px;color:#e2e8f0;border:1px solid rgba(99,102,241,.3);max-width:95%;';
+    const total=res.reduce((s,r)=>s+r.it.rawTotal,0);
+    const mo=(CalcApp.userRole==='client'?Config.minOrderClient:Config.minOrderManager)||15;
+    const ft=Utils.roundTo5(Math.max(total,mo));
+    let html='<div style="color:#a78bfa;font-weight:600;margin-bottom:6px;">Apskai\u010diuota:</div>';
+    res.forEach(({it})=>{
+      html+='<div style="margin-bottom:2px;">'+it.material+' '+it.dimensions+' \xd7'+it.qty+' = <b>'+it.rawTotal.toFixed(2)+' EUR</b></div>';
+    });
+    if(res.length>1)html+='<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(148,163,184,.2);"><b>Viso: '+ft.toFixed(2)+' EUR</b> be PVM ('+Utils.round(ft*1.21,2).toFixed(2)+' su PVM)</div>';
+    html+='<div style="margin-top:8px;display:flex;gap:8px;">';
+    html+='<button onclick="ChatBot.confirmAdd()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:600;">Prid\u0117ti \u012f s\u0105mat\u0105 \u2713</button>';
+    html+='<button onclick="ChatBot.cancelAdd()" style="background:#334155;color:#94a3b8;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:11px;">Ne, at\u0161aukti</button>';
+    html+='</div>';
+    d.innerHTML=html;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
+    this._pendingFills=fills;
+  },
+  confirmAdd(){
+    if(!this._pendingFills)return;
+    let added=0;
+    this._pendingFills.forEach(p=>{if(this.fillCalculator(p)){CalcApp.addToQuote();added++;}});
+    this._pendingFills=null;
+    const d=document.createElement('div');
+    d.style.cssText='background:#064e3b;border-radius:8px;padding:8px 12px;font-size:12px;color:#6ee7b7;max-width:92%;';
+    d.textContent='Prid\u0117ta '+added+' poz. \u012f Galutin\u0119 s\u0105mat\u0105! \u2705';
+    document.getElementById('chatMessages').appendChild(d);
+    document.getElementById('chatMessages').scrollTop=9999;
+  },
+  cancelAdd(){
+    this._pendingFills=null;
+    const d=document.createElement('div');
+    d.style.cssText='background:#0f172a;border-radius:8px;padding:8px 12px;font-size:12px;color:#94a3b8;max-width:92%;';
+    d.textContent='Gerai, nepridedu.';
+    document.getElementById('chatMessages').appendChild(d);
+    document.getElementById('chatMessages').scrollTop=9999;
+  },
   addMsg(t,r){
     const m=document.getElementById('chatMessages');
     const d=document.createElement('div');
+    const fills=r!=='user'?this.parseFills(t):[];
+    const txt=fills.length>0?this.stripFills(t):t;
     d.style.cssText=r==='user'
       ?'background:#7c3aed;border-radius:10px 10px 2px 10px;padding:9px 12px;font-size:12px;color:white;align-self:flex-end;max-width:85%;word-break:break-word;'
       :'background:#0f172a;border-radius:10px 10px 10px 2px;padding:9px 12px;font-size:12px;color:#e2e8f0;border:1px solid rgba(148,163,184,.1);max-width:92%;white-space:pre-wrap;word-break:break-word;';
-    d.textContent=t;
-    m.appendChild(d);
+    d.textContent=txt;
+    if(txt)m.appendChild(d);
     m.scrollTop=m.scrollHeight;
+    if(fills.length>0){setTimeout(()=>this.processFills(fills),400);}
     return d;
   },
+
   async send(){
     const inp=document.getElementById('chatInput');
     const txt=inp?.value.trim();
