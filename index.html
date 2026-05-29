@@ -2080,6 +2080,17 @@ const ChatBot={
 • NIEKADA neaprasyk skaiciavimo eigos: rodyk tik galutinį rezultatą.
 • Jei trūksta info (dydis/medziaga/kiekis/spauda) - paklausk TIK to, ko trūksta.
 • Kai turi visus duomenis - VISADA naudok fill_calculator tool. Kalkuliatorius pats apskaičiuos tikrąją kainą.
+• MAŽIAU atsiprašinėjimu. Niekada nesakyk "Atsiprašau" ar "Sorry". Vietoj to: "Taisau" arba "Patikslinu" arba tiesiog pataisai.
+• PRIVALOMA paklausti pries skaiciavima:
+  - PVC 3-19mm (pvc_3_19), Stadur, Akrilas, Aliuminio kompozitas → "Pjovimas peiliu (cutting) ar CNC frezavimas (milling)?"
+  - Dual medziagos (blockout, backlight_tent, sub_block360) → "Vienpusė (4+0) ar dvipusė (4+4) spauda?"
+  - Lipnioms plėvelėms film_self/film_auto/film_backlight → "Matinis ar blizgus pavirsius?"
+  - film_uv → "Skaidri ar balta? Matinis ar blizgus?"
+  - Auto plėvelė film_auto → automatiškai pridek laminavima (laminuoti BŪTINA, paklausk kurio tipo)
+  - Mikrogofras micro_1_5 → "Baltas/Baltas ar Rudas/Rudas?"
+  - Akrilas → "Skaidrus, baltas opaque ar pieno baltas? Kokio storio (2,3,4,5,6,10mm)?"
+  - Braizytas alu → "Sidabras ar auksas?"
+• Nuolaidu klausimas - atsakyk: "Tai vadybos klausimas." Trumpai. Be skaičiavimo.
 
 ================== ŽINIOS APIE SPAUDĄ ==================
 SPAUDOS TIPAI:
@@ -2355,6 +2366,33 @@ ${this._svcSummary(lang, markup)}`;
       }
     }
   },
+  // 1 retry для network errors; recovery от tool_use_id ошибок (clean history + повтор)
+  async _callApi(){
+    const systemBlocks = [
+      { type:'text', text: this._staticKnowledge(), cache_control: {type:'ephemeral'} },
+      { type:'text', text: this._dynamicContext() }
+    ];
+    const body = JSON.stringify({
+      model: this.MODEL,
+      max_tokens: 1500,
+      system: systemBlocks,
+      tools: this._tools(),
+      messages: this.history
+    });
+    const fetchOnce = async () => {
+      const res = await fetch(SB_URL+'/functions/v1/chat-proxy',{
+        method:'POST', headers:{'Content-Type':'application/json'}, body
+      });
+      return await res.json();
+    };
+    try {
+      return await fetchOnce();
+    } catch(e1){
+      console.warn('Bot: 1st attempt failed, retrying...', e1);
+      await new Promise(r=>setTimeout(r,800));
+      return await fetchOnce();
+    }
+  },
   async send(){
     const inp=document.getElementById('chatInput');
     const txt=inp?.value.trim();
@@ -2366,22 +2404,14 @@ ${this._svcSummary(lang, markup)}`;
     this.isLoading=true;
     const ld=this.addMsg('⏳','bot');
     try{
-      const systemBlocks = [
-        { type:'text', text: this._staticKnowledge(), cache_control: {type:'ephemeral'} },
-        { type:'text', text: this._dynamicContext() }
-      ];
-      const res=await fetch(SB_URL+'/functions/v1/chat-proxy',{
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body:JSON.stringify({
-          model: this.MODEL,
-          max_tokens: 1500,
-          system: systemBlocks,
-          tools: this._tools(),
-          messages: this.history
-        })
-      });
-      const data=await res.json();
+      let data = await this._callApi();
+      // RECOVERY: если история сломана (tool_use_id error) — очищаем и retry
+      if(data.error && typeof data.error==='object' && /tool_use_id/.test(JSON.stringify(data.error))){
+        console.warn('Bot: history corruption detected, clearing and retrying');
+        // Оставляем только последнее user сообщение (text)
+        this.history = [{role:'user', content:txt}];
+        data = await this._callApi();
+      }
       if(data.error){
         ld.textContent='⚠ Klaida: '+(typeof data.error==='string'?data.error:JSON.stringify(data.error));
         return;
@@ -2394,18 +2424,23 @@ ${this._svcSummary(lang, markup)}`;
         if(blk.type==='text') textReply += blk.text;
         else if(blk.type==='tool_use') toolUses.push(blk);
       }
+      // Показываем текстовый ответ
       if(textReply.trim()) this.addMsg(textReply.trim(),'bot');
-      this.history.push({role:'assistant', content: content});
+      // ВАЖНО: храним в history ТОЛЬКО text-блоки.
+      // Tool use/result не сохраняем — calculator уже показал результат отдельной карточкой.
+      // Это гарантирует что история не сломается ни при trim, ни при retry.
+      if(textReply.trim()){
+        this.history.push({role:'assistant', content: textReply.trim()});
+      } else if(toolUses.length>0){
+        // Если бот ТОЛЬКО tool_use без текста — суммаризируем для контекста
+        const summary = '[Apskaičiavau kainą per kalkuliatorių — vartotojas matė rezultatą]';
+        this.history.push({role:'assistant', content: summary});
+      }
+      // Обрабатываем tool calls (заполняем калькулятор + показываем карточку)
       if(toolUses.length>0){
         await this.processToolUses(toolUses);
-        const toolResults = toolUses.map(tu=>({
-          type:'tool_result',
-          tool_use_id: tu.id,
-          content: 'Sėkmingai užpildyta. Kaina parodyta vartotojui.'
-        }));
-        this.history.push({role:'user', content: toolResults});
-        this._trimHistory();
       }
+      this._trimHistory();
     }catch(e){
       ld.textContent='⚠ Klaida: '+e.message;
       console.error('Bot error:',e);
