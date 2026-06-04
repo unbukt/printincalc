@@ -1041,7 +1041,7 @@ this.updateLivePreview();
 checkLamWrap() {
 if(this.currentMaterial?.id==='lamination_standalone') return;
 const lc = document.querySelector('#services input[value="lamination"]'), w = document.getElementById('laminateWrap');
-const nd = this.currentMaterial && ['film_self','film_auto','film_perforated','film_backlight'].includes(this.currentMaterial.id);
+const nd = this.currentMaterial && (this.currentMaterial.type === 'film' || ['film_self','film_auto','film_perforated','film_backlight'].includes(this.currentMaterial.id));
 const fcw = document.getElementById('lamFinishCheckWrap');
 if(nd && lc && lc.checked) {
 w.classList.remove('hidden');
@@ -1202,7 +1202,7 @@ bd.push({ label:this.t(`svc_${cb.value}`), qty:Utils.round(qtyVal, isPerim ? 3 :
 const lc=document.querySelector('#services input[value="lamination"]');
 if(lc && lc.checked){
 let lr=3, ll=this.t('svc_lamination');
-const isVinyl = this.currentMaterial && ['film_self','film_auto','film_perforated','film_backlight'].includes(this.currentMaterial.id);
+const isVinyl = this.currentMaterial && (this.currentMaterial.type === 'film' || ['film_self','film_auto','film_perforated','film_backlight'].includes(this.currentMaterial.id));
 if(isVinyl){
 const av = parseFloat(document.getElementById('laminateType').value) || 0;
 if(av > 0){ lr += av; ll += ` ${this.t({'2':'lam_econ','5':'lam_2d','8':'lam_antislip','10':'lam_3d'}[av]||'')}`; }
@@ -1354,7 +1354,59 @@ animateCounter(elId, targetValue) {
 },
 removeQ(id){ if(confirm(this.t('removeItem'))){ this.quoteItems = this.quoteItems.filter(i => i.id !== id); if(this.editingId===id) this.cancelEdit(); this.renderQuoteItems(); this.toast(this.t('itemRemoved'),'success'); } },
 clearQuote(){ if(confirm(this.t('clearConfirm'))){ this.quoteItems=[]; const cn=document.getElementById('clientName'); if(cn) cn.value=''; const wcn=document.getElementById('wizClientName'); if(wcn) wcn.value=''; this.cancelEdit(); this.renderQuoteItems(); } },
-doLogout(){ try { sessionStorage.removeItem('printin_auth'); sessionStorage.removeItem('printin_role'); } catch(e) {} this.priceMultiplier = 1.0; this.userRole = 'manager'; document.getElementById('clientBadge').classList.add('hidden'); const kbl=document.getElementById('kainosBtn'); if(kbl) kbl.classList.remove('hidden'); document.getElementById('adminBadge')?.classList.add('hidden'); document.getElementById('adminBtn')?.classList.add('hidden'); document.body.classList.remove('client-mode'); document.getElementById('authModal').classList.remove('hidden'); },
+// Полный сброс состояния калькулятора + бота к defaults
+_fullReset(){
+  try {
+    // 1. Quote items
+    this.quoteItems = [];
+    this.editingId = null;
+    this._pendingFills = null;
+    // 2. Client name
+    const cn=document.getElementById('clientName'); if(cn) cn.value='';
+    const wcn=document.getElementById('wizClientName'); if(wcn) wcn.value='';
+    // 3. Размеры на default 1000×1000, qty=1
+    const w=document.getElementById('width'); if(w) w.value='1000';
+    const h=document.getElementById('height'); if(h) h.value='1000';
+    const q=document.getElementById('quantity'); if(q) q.value='1';
+    // 4. Категория и материал — сброс
+    const cat=document.getElementById('category'); if(cat) cat.value='';
+    this.currentMaterial = null;
+    // 5. Сброс служебных полей (welding/sewing/cuttingMethod/printType/laminate)
+    ['weldingLength','sewingLength','linearCutLength'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='0';});
+    const cm=document.getElementById('cuttingMethod'); if(cm) cm.value='none';
+    const lt=document.getElementById('laminateType'); if(lt) lt.value='0';
+    // 6. Скрываем динамические блоки + сбрасываем чекбоксы
+    this.resetDyn?.();
+    // 7. Editing banner скрыть
+    document.getElementById('editingBanner')?.classList.add('hidden');
+    const btn=document.getElementById('addToQuoteBtn'); if(btn) btn.textContent=this.t('addToQuote');
+    // 8. Перерисовываем UI
+    this.updateMaterials?.();
+    this.renderQuoteItems?.();
+    this.checkSplitWarning?.();
+    // 9. Сброс бота
+    if(typeof ChatBot!=='undefined'){
+      ChatBot.history = [];
+      ChatBot._pendingFills = null;
+      ChatBot.isLoading = false;
+      const msgs=document.getElementById('chatMessages');
+      if(msgs){
+        msgs.innerHTML='<div style="background:#0f172a;border-radius:10px;padding:10px 12px;font-size:12px;color:#94a3b8;border:1px solid rgba(148,163,184,.1);max-width:90%;">Sveiki! Galiu padėti apskaičiuoti spausdinimo kainą. Aprašykite medžiagą, dydį ir kiekį 😊</div>';
+      }
+    }
+  } catch(e) { console.warn('_fullReset error:', e); }
+},
+doLogout(){
+  this._fullReset();
+  try { sessionStorage.removeItem('printin_auth'); sessionStorage.removeItem('printin_role'); } catch(e) {}
+  this.priceMultiplier = 1.0; this.userRole = 'manager';
+  document.getElementById('clientBadge')?.classList.add('hidden');
+  const kbl=document.getElementById('kainosBtn'); if(kbl) kbl.classList.remove('hidden');
+  document.getElementById('adminBadge')?.classList.add('hidden');
+  document.getElementById('adminBtn')?.classList.add('hidden');
+  document.body.classList.remove('client-mode');
+  document.getElementById('authModal').classList.remove('hidden');
+},
 
 exportPDF(){
 if(!this.quoteItems.length) return;
@@ -1639,11 +1691,17 @@ if(authM) {
   const obs = new MutationObserver(() => {
     if(authM.classList.contains('hidden')) {
       // Posle uspešnoj autorizacii — sinkhroniziruem userRole iz sessionStorage
+      const oldRole = this.userRole;
       try {
         const r = sessionStorage.getItem('printin_role');
         if(r === 'admin') { this.priceMultiplier = 1.0; this.userRole = 'admin'; }
         else if(r === 'client') { this.priceMultiplier = Config.clientMarkup || 1.25; this.userRole = 'client'; }
+        else { this.priceMultiplier = 1.0; this.userRole = 'manager'; }
       } catch(e) {}
+      // Если роль СМЕНИЛАСЬ — полный сброс калькулятора и бота
+      if(oldRole && oldRole !== this.userRole){
+        this._fullReset();
+      }
       this.applyRoleUI();
     }
   });
