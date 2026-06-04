@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Print In calculator</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<!-- Tailwind CDN: defer чтобы не блокировал рендеринг (Safari freeze fix) -->
+<script src="https://cdn.tailwindcss.com" defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <!-- EmailJS — dlja otpravki PDF na email -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -1688,7 +1689,8 @@ this.applyRoleUI();
 // Slušaem zakrytie auth modal'ki (čerez klik ILI Enter — pokryvaet oba puti)
 const authM = document.getElementById('authModal');
 if(authM) {
-  const obs = new MutationObserver(() => {
+  // Сохраняем observer глобально чтобы pagehide мог disconnect (Safari fix)
+  window._authObserver = new MutationObserver(() => {
     if(authM.classList.contains('hidden')) {
       // Posle uspešnoj autorizacii — sinkhroniziruem userRole iz sessionStorage
       const oldRole = this.userRole;
@@ -1705,6 +1707,7 @@ if(authM) {
       this.applyRoleUI();
     }
   });
+  const obs = window._authObserver;
   obs.observe(authM, { attributes: true, attributeFilter: ['class'] });
 }
 document.getElementById('pvcThickness').addEventListener('input', ()=>{ this.updateMaterialPrice(); this.updateServices(); this.updateLivePreview(); });
@@ -1721,9 +1724,44 @@ this.generateRefTable();
 // ===== Supabase + Admin Panel =====
 const SB_URL='https://pudvzrxxnggqnymesxqi.supabase.co',SB_KEY='sb_publishable_qPyF60qXm-_JQdjDgF0X2w_4nRspbZV';
 const SupabaseService={
-  async fetch(t,filter=''){try{const r=await fetch(SB_URL+'/rest/v1/'+t+'?select=*'+(filter?'&'+filter:''),{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});return r.ok?await r.json():[];}catch(e){console.warn('Supabase fetch fail:',t,e);return [];}},
-  async upsert(t,d){try{const r=await fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify(Array.isArray(d)?d:[d])});if(!r.ok){console.warn('Supabase upsert HTTP',r.status,await r.text());}return r.ok;}catch(e){console.warn('Supabase upsert fail:',t,e);return false;}},
-  async delete(t,filter){try{const r=await fetch(SB_URL+'/rest/v1/'+t+'?'+filter,{method:'DELETE',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});return r.ok;}catch(e){console.warn('Supabase delete fail:',t,e);return false;}}
+  // Безопасные SIGNAL для всех fetch - чтобы pagehide мог прервать
+  _signal(){ return window._pageAbortCtrl?.signal; },
+  // Таймаут 8 сек чтобы не вешать страницу если Supabase не отвечает
+  _timeoutCtrl(ms=8000){ const c=new AbortController(); setTimeout(()=>c.abort(),ms); return c; },
+  async fetch(t,filter=''){
+    const localCtrl = this._timeoutCtrl(8000);
+    try{
+      const r=await fetch(SB_URL+'/rest/v1/'+t+'?select=*'+(filter?'&'+filter:''),{
+        headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY},
+        signal: localCtrl.signal
+      });
+      return r.ok?await r.json():[];
+    }catch(e){console.warn('Supabase fetch fail:',t,e.name||e);return [];}
+  },
+  async upsert(t,d){
+    const localCtrl = this._timeoutCtrl(10000);
+    try{
+      const r=await fetch(SB_URL+'/rest/v1/'+t,{
+        method:'POST',
+        headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},
+        body:JSON.stringify(Array.isArray(d)?d:[d]),
+        signal: localCtrl.signal
+      });
+      if(!r.ok){console.warn('Supabase upsert HTTP',r.status,await r.text());}
+      return r.ok;
+    }catch(e){console.warn('Supabase upsert fail:',t,e.name||e);return false;}
+  },
+  async delete(t,filter){
+    const localCtrl = this._timeoutCtrl(8000);
+    try{
+      const r=await fetch(SB_URL+'/rest/v1/'+t+'?'+filter,{
+        method:'DELETE',
+        headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY},
+        signal: localCtrl.signal
+      });
+      return r.ok;
+    }catch(e){console.warn('Supabase delete fail:',t,e.name||e);return false;}
+  }
 };
 
 // Helper: безопасный HTML-escape (защита от XSS)
@@ -2438,10 +2476,17 @@ ${this._svcSummary(lang, markup)}`;
       messages: this.history
     });
     const fetchOnce = async () => {
-      const res = await fetch(SB_URL+'/functions/v1/chat-proxy',{
-        method:'POST', headers:{'Content-Type':'application/json'}, body
-      });
-      return await res.json();
+      // Таймаут 30 сек чтобы Safari не висел на медленных ответах бота
+      const ctrl = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 30000);
+      try {
+        const res = await fetch(SB_URL+'/functions/v1/chat-proxy',{
+          method:'POST', headers:{'Content-Type':'application/json'}, body, signal: ctrl.signal
+        });
+        return await res.json();
+      } finally {
+        clearTimeout(timer);
+      }
     };
     try {
       return await fetchOnce();
@@ -2507,13 +2552,38 @@ ${this._svcSummary(lang, markup)}`;
     }
   }
 };
+// AbortController для Supabase fetches - чтобы можно было прервать при unload
+window._pageAbortCtrl = new AbortController();
+
 window.addEventListener('load', () => {
   CalcApp.init();
   AdminPanel.loadFromSupabase().then(() => {
-    // Применяем настройки клиентского markup'а если он залогинен
     if(CalcApp.userRole==='client' && Config.clientMarkup!=null) CalcApp.priceMultiplier=Config.clientMarkup;
     try { CalcApp.generateRefTable(); CalcApp.updateLivePreview(); CalcApp.renderQuoteItems(); } catch(e){}
   });
+});
+
+// === SAFARI FREEZE FIX ===
+// Cleanup при уходе со страницы. Safari (WebKit) особо чувствителен к pending обработчикам
+// и наблюдателям при refresh/close. Без этого страница висит при обновлении.
+window.addEventListener('pagehide', (e) => {
+  try {
+    // 1. Отключаем все MutationObservers (главный — в auth модуле)
+    if(window._authObserver) { window._authObserver.disconnect(); window._authObserver = null; }
+    // 2. Прерываем все pending HTTP запросы (Supabase, EmailJS, ChatBot)
+    if(window._pageAbortCtrl) { try { window._pageAbortCtrl.abort(); } catch(_){} }
+    // 3. Сбрасываем bot loading state чтобы не блокировал
+    if(typeof ChatBot !== 'undefined') ChatBot.isLoading = false;
+    // 4. Очищаем pending timeouts при freeze
+    if(window._pendingTimers) { window._pendingTimers.forEach(t => clearTimeout(t)); window._pendingTimers = []; }
+  } catch(err) { /* silently fail */ }
+}, false);
+
+// Дополнительно: при visibility hide (tab switch) — pause heavy operations
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'hidden') {
+    // Не делаем нового состояния, просто разрешаем cleanup
+  }
 });
 </script>
 
