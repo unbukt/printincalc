@@ -1737,7 +1737,16 @@ const SupabaseService={
       return r.ok?await r.json():[];
     }catch(e){console.warn('Supabase fetch fail:',t,e.name||e);return [];}
   },
+  // 2026-10-15: the public key can no longer write prices, settings or
+  // allowed services (anyone holding it could change a price the agent quotes).
+  // They are edited in the manager cabinet, behind a personal login.
+  _readOnly(t){
+    if(!['prices','settings','allowed_services'].includes(t)) return false;
+    try{ AdminPanel.notify('Kainos keičiamos tik kabinete: printing-agent.eu/manager/prices','err'); }catch(e){}
+    return true;
+  },
   async upsert(t,d){
+    if(this._readOnly(t)) return false;
     const localCtrl = this._timeoutCtrl(10000);
     try{
       const r=await fetch(SB_URL+'/rest/v1/'+t,{
@@ -1751,6 +1760,7 @@ const SupabaseService={
     }catch(e){console.warn('Supabase upsert fail:',t,e.name||e);return false;}
   },
   async delete(t,filter){
+    if(this._readOnly(t)) return false;
     const localCtrl = this._timeoutCtrl(8000);
     try{
       const r=await fetch(SB_URL+'/rest/v1/'+t+'?'+filter,{
@@ -2589,7 +2599,7 @@ document.addEventListener('visibilitychange', () => {
 <div id="adminModal" class="modal" onclick="if(event.target===this)AdminPanel.close()">
 <div class="modal-content" style="max-width:1100px;max-height:92vh;">
 <button class="close-modal" onclick="AdminPanel.close()">x</button>
-<div class="flex items-center gap-3 mb-3"><h2 class="text-lg font-semibold text-white">Admin Panel</h2><span id="adminNotif" class="hidden text-xs px-2 py-1 rounded border"></span></div>
+<div class="flex items-center gap-3 mb-3"><h2 class="text-lg font-semibold text-white">Admin Panel</h2><span id="adminNotif" class="hidden text-xs px-2 py-1 rounded border"></span></div><div class="mb-3 text-xs px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-200">Saugumo sumetimais kainos, paslaugos ir nustatymai čia tik peržiūrimi. Keisti: <a href="https://www.printing-agent.eu/manager/prices" target="_blank" rel="noopener" class="underline text-amber-100">vadybininko kabinete → Kainos</a> (asmeninis prisijungimas, visi pakeitimai žurnale).</div>
 <div class="flex gap-2 mb-3">
 <button id="abtn-materials" onclick="AdminPanel.showTab('materials')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-600 transition">Medžiagos</button>
 <button id="abtn-services" onclick="AdminPanel.showTab('services')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-600 transition">Paslaugos</button>
